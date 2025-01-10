@@ -4,16 +4,23 @@ use crossterm::terminal;
 
 fn main() {
     terminal::enable_raw_mode().expect("able to enable raw mode");
+
     io::stdin().bytes().any(|byte| {
-        let ch = byte.expect("ascii character") as char;
-        println!("{}", ch);
+        let byte = byte.expect("successful read");
+        let ch = byte as char;
 
-        let quit = ch == 'q';
-
-        if quit {
-            terminal::disable_raw_mode().expect("able to disable raw mode");
+        if ch.is_control() {
+            println!("Binary: {0:08b} ASCII: {0:#03} \r", byte);
+        } else {
+            println!(
+                "Binary: {0:08b} ASCII: {0:#03} Character: {1:#?} \r",
+                byte, ch
+            );
         }
 
+        let quit = ch == 'q';
         quit
     });
+
+    terminal::disable_raw_mode().expect("able to disable raw mode");
 }
