@@ -7,24 +7,28 @@ pub struct Editor;
 
 impl Editor {
     pub fn run(&self) {
-        terminal::enable_raw_mode().expect("able to enable raw mode");
+        if let Err(err) = self.repl() {
+            panic!("{err:#?}");
+        }
+        print!("Goodbye.\r\n");
+    }
+
+    fn repl(&self) -> Result<(), std::io::Error> {
+        terminal::enable_raw_mode()?;
 
         loop {
-            match event::read() {
-                Ok(Event::Key(event)) => {
-                    println!("{event:?} \r");
+            if let Event::Key(event) = event::read()? {
+                println!("{event:?} \r");
 
-                    if let KeyCode::Char(ch) = event.code {
-                        if ch == 'q' {
-                            break;
-                        }
+                if let KeyCode::Char(ch) = event.code {
+                    if ch == 'q' {
+                        break;
                     }
                 }
-                Err(err) => eprintln!("Error: {err}"),
-                _ => {}
             }
         }
 
-        terminal::disable_raw_mode().expect("able to disable raw mode");
+        terminal::disable_raw_mode()?;
+        Ok(())
     }
 }
