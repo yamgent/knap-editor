@@ -12,7 +12,7 @@ impl Editor {
         loop {
             match event::read() {
                 Ok(Event::Key(event)) => {
-                    println!("{:?} \r", event);
+                    println!("{event:?} \r");
 
                     if let KeyCode::Char(ch) = event.code {
                         if ch == 'q' {
@@ -20,7 +20,7 @@ impl Editor {
                         }
                     }
                 }
-                Err(err) => eprintln!("Error: {}", err),
+                Err(err) => eprintln!("Error: {err}"),
                 _ => {}
             }
         }
