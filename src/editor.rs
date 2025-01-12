@@ -53,15 +53,12 @@ impl Editor {
     }
 
     fn draw(&self) -> Result<()> {
-        terminal::start_draw()?;
+        let state = terminal::start_draw()?;
 
-        terminal::hide_cursor()?;
         self.draw_rows()?;
         self.draw_debug_text()?;
-        terminal::move_cursor(TerminalPos { x: 0, y: 0 })?;
-        terminal::show_cursor()?;
 
-        terminal::end_draw()?;
+        terminal::end_draw(&state)?;
         Ok(())
     }
 
@@ -69,11 +66,7 @@ impl Editor {
         let size = terminal::size()?;
 
         (0..size.y)
-            .map(|y| -> Result<()> {
-                terminal::move_cursor(TerminalPos { x: 0, y })?;
-                terminal::draw_text("~")?;
-                Ok(())
-            })
+            .map(|y| terminal::draw_text(TerminalPos { x: 0, y }, "~"))
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 
@@ -81,8 +74,7 @@ impl Editor {
     }
 
     fn draw_debug_text(&self) -> Result<()> {
-        terminal::move_cursor(TerminalPos { x: 5, y: 5 })?;
-        terminal::draw_text(&self.debug)?;
+        terminal::draw_text(TerminalPos { x: 5, y: 5 }, &self.debug)?;
         Ok(())
     }
 }
