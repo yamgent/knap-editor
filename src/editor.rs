@@ -55,14 +55,14 @@ impl Editor {
     fn draw(&self) -> Result<()> {
         let state = terminal::start_draw()?;
 
-        self.draw_rows()?;
+        self.draw_row_columns()?;
         self.draw_debug_text()?;
 
         terminal::end_draw(&state)?;
         Ok(())
     }
 
-    fn draw_rows(&self) -> Result<()> {
+    fn draw_row_columns(&self) -> Result<()> {
         let size = terminal::size()?;
 
         (0..size.y)
@@ -74,7 +74,22 @@ impl Editor {
     }
 
     fn draw_debug_text(&self) -> Result<()> {
-        terminal::draw_text(TerminalPos { x: 5, y: 5 }, &self.debug)?;
+        let size = terminal::size()?;
+
+        let x_pos = size.x / 3;
+        let y_pos = size.y / 3;
+
+        terminal::draw_text(
+            TerminalPos { x: x_pos, y: y_pos },
+            "hecto editor -- version 0.1.0",
+        )?;
+        terminal::draw_text(
+            TerminalPos {
+                x: x_pos,
+                y: y_pos + 1,
+            },
+            &self.debug,
+        )?;
         Ok(())
     }
 }
