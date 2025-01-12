@@ -1,44 +1,29 @@
-use std::io;
-
 use anyhow::Result;
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
-    execute,
-    terminal::{self, Clear, ClearType},
-};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 
-fn clear_screen() -> Result<()> {
-    execute!(io::stdout(), Clear(ClearType::All))?;
-    Ok(())
-}
-
-fn init_terminal() -> Result<()> {
-    terminal::enable_raw_mode()?;
-    clear_screen()?;
-    Ok(())
-}
-
-fn end_terminal() -> Result<()> {
-    clear_screen()?;
-    terminal::disable_raw_mode()?;
-    Ok(())
-}
+use crate::terminal;
 
 pub struct Editor {
+    // TODO: Remove debug
+    debug: String,
+
     should_quit: bool,
 }
 
 impl Editor {
     pub fn new() -> Self {
-        Self { should_quit: false }
+        Self {
+            debug: String::new(),
+            should_quit: false,
+        }
     }
 
     pub fn run(&mut self) {
-        init_terminal().expect("able to initialize terminal");
+        terminal::init_terminal().expect("able to initialize terminal");
 
         let repl_result = self.repl();
 
-        end_terminal().expect("able to deinit terminal");
+        terminal::end_terminal().expect("able to deinit terminal");
         repl_result.expect("repl has no fatal error");
     }
 
@@ -46,6 +31,7 @@ impl Editor {
         while !self.should_quit {
             let event = event::read()?;
             self.handle_event(&event);
+            self.draw()?;
         }
         Ok(())
     }
@@ -55,6 +41,8 @@ impl Editor {
             code, modifiers, ..
         }) = event
         {
+            self.debug = format!("{code:?} {modifiers:?}");
+
             if matches!(
                 (code, modifiers),
                 (&KeyCode::Char('q'), &KeyModifiers::CONTROL)
@@ -62,5 +50,27 @@ impl Editor {
                 self.should_quit = true;
             }
         }
+    }
+
+    fn draw(&self) -> Result<()> {
+        terminal::clear_screen()?;
+
+        let size = terminal::size()?;
+
+        (0..size.1)
+            .map(|y| -> Result<()> {
+                terminal::move_cursor((0, y))?;
+                print!("~");
+                Ok(())
+            })
+            .find(Result::is_err)
+            .unwrap_or(Ok(()))?;
+
+        terminal::move_cursor((5, 5))?;
+        print!("{}", self.debug);
+
+        terminal::move_cursor((0, 0))?;
+
+        Ok(())
     }
 }
