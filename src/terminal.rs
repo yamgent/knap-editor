@@ -16,7 +16,7 @@ pub struct TerminalPos {
 }
 
 pub struct TerminalRestoreState {
-    cursor_pos: TerminalPos,
+    pub cursor_pos: TerminalPos,
 }
 
 pub fn init_terminal() -> Result<()> {
