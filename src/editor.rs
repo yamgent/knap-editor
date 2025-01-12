@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 
-use crate::terminal;
+use crate::terminal::{self, TerminalPos};
 
 pub struct Editor {
     // TODO: Remove debug
@@ -53,20 +53,25 @@ impl Editor {
     }
 
     fn draw(&self) -> Result<()> {
-        terminal::clear_screen()?;
+        terminal::start_draw()?;
+
+        terminal::hide_cursor()?;
         self.draw_rows()?;
         self.draw_debug_text()?;
-        terminal::move_cursor((0, 0))?;
+        terminal::move_cursor(TerminalPos { x: 0, y: 0 })?;
+        terminal::show_cursor()?;
+
+        terminal::end_draw()?;
         Ok(())
     }
 
     fn draw_rows(&self) -> Result<()> {
         let size = terminal::size()?;
 
-        (0..size.1)
+        (0..size.y)
             .map(|y| -> Result<()> {
-                terminal::move_cursor((0, y))?;
-                print!("~");
+                terminal::move_cursor(TerminalPos { x: 0, y })?;
+                terminal::draw_text("~")?;
                 Ok(())
             })
             .find(Result::is_err)
@@ -76,8 +81,8 @@ impl Editor {
     }
 
     fn draw_debug_text(&self) -> Result<()> {
-        terminal::move_cursor((5, 5))?;
-        print!("{}", self.debug);
+        terminal::move_cursor(TerminalPos { x: 5, y: 5 })?;
+        terminal::draw_text(&self.debug)?;
         Ok(())
     }
 }
