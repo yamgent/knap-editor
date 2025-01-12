@@ -54,7 +54,13 @@ impl Editor {
 
     fn draw(&self) -> Result<()> {
         terminal::clear_screen()?;
+        self.draw_rows()?;
+        self.draw_debug_text()?;
+        terminal::move_cursor((0, 0))?;
+        Ok(())
+    }
 
+    fn draw_rows(&self) -> Result<()> {
         let size = terminal::size()?;
 
         (0..size.1)
@@ -66,11 +72,12 @@ impl Editor {
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 
+        Ok(())
+    }
+
+    fn draw_debug_text(&self) -> Result<()> {
         terminal::move_cursor((5, 5))?;
         print!("{}", self.debug);
-
-        terminal::move_cursor((0, 0))?;
-
         Ok(())
     }
 }
