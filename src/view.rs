@@ -28,12 +28,32 @@ impl View {
             .iter()
             .take(size.y as usize)
             .enumerate()
-            .map(|(y, line)| terminal::draw_text(TerminalPos { x: 0, y: y as u16 }, line))
+            .map(|(y, line)| {
+                terminal::draw_text(
+                    TerminalPos {
+                        x: 0,
+                        // y could not be bigger than size.y, which is u16
+                        #[allow(clippy::cast_possible_truncation)]
+                        y: y as u16,
+                    },
+                    line,
+                )
+            })
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 
         (self.buffer.content.len()..(size.y as usize))
-            .map(|y| terminal::draw_text(TerminalPos { x: 0, y: y as u16 }, "~"))
+            .map(|y| {
+                terminal::draw_text(
+                    TerminalPos {
+                        x: 0,
+                        // y could not be bigger than size.y, which is u16
+                        #[allow(clippy::cast_possible_truncation)]
+                        y: y as u16,
+                    },
+                    "~",
+                )
+            })
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 

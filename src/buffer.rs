@@ -13,7 +13,10 @@ impl Buffer {
         let content = std::fs::read_to_string(filename.as_ref())?;
 
         Ok(Self {
-            content: content.lines().map(|x| x.to_string()).collect(),
+            content: content
+                .lines()
+                .map(std::string::ToString::to_string)
+                .collect(),
         })
     }
 }
