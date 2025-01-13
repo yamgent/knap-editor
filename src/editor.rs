@@ -1,12 +1,13 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use crate::terminal::{self, TerminalPos};
+use crate::{
+    terminal::{self, TerminalPos},
+    view::View,
+};
 
 pub struct Editor {
-    // TODO: Remove debug
-    debug: String,
-
+    view: View,
     should_quit: bool,
     cursor_pos: TerminalPos,
 }
@@ -14,7 +15,7 @@ pub struct Editor {
 impl Editor {
     pub fn new() -> Self {
         Self {
-            debug: String::new(),
+            view: View,
             should_quit: false,
             cursor_pos: TerminalPos { x: 0, y: 0 },
         }
@@ -46,8 +47,6 @@ impl Editor {
             ..
         }) = event
         {
-            self.debug = format!("{code:?} {modifiers:?}");
-
             let size = terminal::size()?;
 
             match (code, modifiers) {
@@ -96,43 +95,11 @@ impl Editor {
     fn draw(&self) -> Result<()> {
         let mut state = terminal::start_draw()?;
 
-        self.draw_row_columns()?;
-        self.draw_debug_text()?;
+        self.view.render()?;
 
         state.cursor_pos = self.cursor_pos;
 
         terminal::end_draw(&state)?;
-        Ok(())
-    }
-
-    fn draw_row_columns(&self) -> Result<()> {
-        let size = terminal::size()?;
-
-        (0..size.y)
-            .map(|y| terminal::draw_text(TerminalPos { x: 0, y }, "~"))
-            .find(Result::is_err)
-            .unwrap_or(Ok(()))?;
-
-        Ok(())
-    }
-
-    fn draw_debug_text(&self) -> Result<()> {
-        let size = terminal::size()?;
-
-        let x_pos = size.x / 3;
-        let y_pos = size.y / 3;
-
-        terminal::draw_text(
-            TerminalPos { x: x_pos, y: y_pos },
-            "hecto editor -- version 0.1.0",
-        )?;
-        terminal::draw_text(
-            TerminalPos {
-                x: x_pos,
-                y: y_pos + 1,
-            },
-            &self.debug,
-        )?;
         Ok(())
     }
 }
