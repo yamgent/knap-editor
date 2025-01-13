@@ -16,6 +16,10 @@ impl View {
         }
     }
 
+    pub fn new_with_buffer(buffer: Buffer) -> Self {
+        Self { buffer }
+    }
+
     pub fn render(&self) -> Result<()> {
         let size = terminal::size()?;
 
