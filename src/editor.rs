@@ -7,15 +7,15 @@ use crate::{
 };
 
 pub struct Editor {
-    view: View,
     should_quit: bool,
     cursor_pos: TerminalPos,
+    view: View,
 }
 
 impl Editor {
     pub fn new() -> Self {
         Self {
-            view: View,
+            view: View::new(),
             should_quit: false,
             cursor_pos: TerminalPos { x: 0, y: 0 },
         }
