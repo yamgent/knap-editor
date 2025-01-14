@@ -3,7 +3,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 
 use crate::{
     buffer::Buffer,
-    terminal::{self, TerminalPos},
+    terminal::{self, TerminalPos, TerminalSize},
     view::View,
 };
 
@@ -17,18 +17,23 @@ pub struct Editor {
 
 impl Editor {
     pub fn new() -> Self {
+        let terminal_size = terminal::size().expect("able to get terminal size");
+
         Self {
             should_quit: false,
             cursor_pos: TerminalPos { x: 0, y: 0 },
-            view: View::new(),
-            status_bar_text: String::new(),
+            view: View::new(TerminalSize {
+                x: terminal_size.x,
+                y: terminal_size.y - 1,
+            }),
+            status_bar_text: "Welcome to hecto".to_string(),
         }
     }
 
     pub fn run(&mut self) {
         terminal::init_terminal().expect("able to initialize terminal");
 
-        self.open_arg_file();
+        self.open_arg_file().expect("open file has no fatal error");
 
         let repl_result = self.repl();
 
@@ -36,17 +41,28 @@ impl Editor {
         repl_result.expect("repl has no fatal error");
     }
 
-    fn open_arg_file(&mut self) {
+    fn open_arg_file(&mut self) -> Result<()> {
+        let terminal_size = terminal::size()?;
+
         if let Some(filename) = std::env::args().nth(1) {
             let buffer = match Buffer::new_from_file(&filename) {
                 Ok(buffer) => buffer,
                 Err(err) => {
                     self.status_bar_text = format!("Cannot load {filename}: {err}");
-                    return;
+                    return Ok(());
                 }
             };
-            self.view = View::new_with_buffer(buffer);
+            self.view = View::new_with_buffer(
+                buffer,
+                TerminalSize {
+                    x: terminal_size.x,
+                    y: terminal_size.y - 1,
+                },
+            );
+            self.status_bar_text = format!(r#""{filename}" opened"#);
         }
+
+        Ok(())
     }
 
     fn repl(&mut self) -> Result<()> {
@@ -59,53 +75,61 @@ impl Editor {
     }
 
     fn handle_event(&mut self, event: &Event) -> Result<()> {
-        if let Event::Key(KeyEvent {
-            code,
-            modifiers,
-            kind: KeyEventKind::Press,
-            ..
-        }) = event
-        {
-            let size = terminal::size()?;
+        match event {
+            Event::Key(KeyEvent {
+                code,
+                modifiers,
+                kind: KeyEventKind::Press,
+                ..
+            }) => {
+                let size = terminal::size()?;
 
-            match (code, modifiers) {
-                (&KeyCode::Char('q'), &KeyModifiers::CONTROL) => {
-                    self.should_quit = true;
-                }
-                (&KeyCode::Left, _) => {
-                    if self.cursor_pos.x > 0 {
-                        self.cursor_pos.x -= 1;
+                match (code, modifiers) {
+                    (&KeyCode::Char('q'), &KeyModifiers::CONTROL) => {
+                        self.should_quit = true;
                     }
-                }
-                (&KeyCode::Right, _) => {
-                    if self.cursor_pos.x < size.x - 1 {
-                        self.cursor_pos.x += 1;
+                    (&KeyCode::Left, _) => {
+                        if self.cursor_pos.x > 0 {
+                            self.cursor_pos.x -= 1;
+                        }
                     }
-                }
-                (&KeyCode::Up, _) => {
-                    if self.cursor_pos.y > 0 {
-                        self.cursor_pos.y -= 1;
+                    (&KeyCode::Right, _) => {
+                        if self.cursor_pos.x < size.x - 1 {
+                            self.cursor_pos.x += 1;
+                        }
                     }
-                }
-                (&KeyCode::Down, _) => {
-                    if self.cursor_pos.y < size.y - 1 {
-                        self.cursor_pos.y += 1;
+                    (&KeyCode::Up, _) => {
+                        if self.cursor_pos.y > 0 {
+                            self.cursor_pos.y -= 1;
+                        }
                     }
+                    (&KeyCode::Down, _) => {
+                        if self.cursor_pos.y < size.y - 1 {
+                            self.cursor_pos.y += 1;
+                        }
+                    }
+                    (&KeyCode::Home, _) => {
+                        self.cursor_pos.x = 0;
+                    }
+                    (&KeyCode::End, _) => {
+                        self.cursor_pos.x = size.x - 1;
+                    }
+                    (&KeyCode::PageUp, _) => {
+                        self.cursor_pos.y = 0;
+                    }
+                    (&KeyCode::PageDown, _) => {
+                        self.cursor_pos.y = size.y - 1;
+                    }
+                    _ => {}
                 }
-                (&KeyCode::Home, _) => {
-                    self.cursor_pos.x = 0;
-                }
-                (&KeyCode::End, _) => {
-                    self.cursor_pos.x = size.x - 1;
-                }
-                (&KeyCode::PageUp, _) => {
-                    self.cursor_pos.y = 0;
-                }
-                (&KeyCode::PageDown, _) => {
-                    self.cursor_pos.y = size.y - 1;
-                }
-                _ => {}
             }
+            Event::Resize(width, height) => {
+                self.view.resize(TerminalSize {
+                    x: *width,
+                    y: *height - 1,
+                });
+            }
+            _ => {}
         }
 
         Ok(())

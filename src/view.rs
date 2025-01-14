@@ -2,31 +2,35 @@ use anyhow::Result;
 
 use crate::{
     buffer::Buffer,
-    terminal::{self, TerminalPos},
+    terminal::{self, TerminalPos, TerminalSize},
 };
 
 pub struct View {
     buffer: Buffer,
+    size: TerminalSize,
 }
 
 impl View {
-    pub fn new() -> Self {
+    pub fn new(size: TerminalSize) -> Self {
         Self {
             buffer: Buffer::new(),
+            size,
         }
     }
 
-    pub fn new_with_buffer(buffer: Buffer) -> Self {
-        Self { buffer }
+    pub fn new_with_buffer(buffer: Buffer, size: TerminalSize) -> Self {
+        Self { buffer, size }
+    }
+
+    pub fn resize(&mut self, size: TerminalSize) {
+        self.size = size;
     }
 
     pub fn render(&self) -> Result<()> {
-        let size = terminal::size()?;
-
         self.buffer
             .content
             .iter()
-            .take(size.y as usize)
+            .take(self.size.y as usize)
             .enumerate()
             .map(|(y, line)| {
                 terminal::draw_text(
@@ -36,13 +40,13 @@ impl View {
                         #[allow(clippy::cast_possible_truncation)]
                         y: y as u16,
                     },
-                    line,
+                    line.chars().take(self.size.x as usize).collect::<String>(),
                 )
             })
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 
-        (self.buffer.content.len()..(size.y as usize))
+        (self.buffer.content.len()..(self.size.y as usize))
             .map(|y| {
                 terminal::draw_text(
                     TerminalPos {
