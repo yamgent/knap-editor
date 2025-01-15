@@ -21,12 +21,17 @@ pub struct TerminalRestoreState {
 
 pub fn init_terminal() -> Result<()> {
     terminal::enable_raw_mode()?;
-    clear_screen()?;
+
+    queue!(io::stdout(), terminal::EnterAlternateScreen)?;
+    io::stdout().flush()?;
+
     Ok(())
 }
 
 pub fn end_terminal() -> Result<()> {
-    clear_screen()?;
+    queue!(io::stdout(), terminal::LeaveAlternateScreen)?;
+    io::stdout().flush()?;
+
     terminal::disable_raw_mode()?;
     Ok(())
 }
@@ -80,10 +85,4 @@ pub fn draw_text<T: AsRef<str>>(pos: TerminalPos, text: T) -> Result<()> {
 fn get_cursor_pos() -> Result<TerminalPos> {
     let pos = cursor::position()?;
     Ok(TerminalPos { x: pos.0, y: pos.1 })
-}
-
-fn clear_screen() -> Result<()> {
-    let state = start_draw()?;
-    end_draw(&state)?;
-    Ok(())
 }
