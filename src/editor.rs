@@ -36,7 +36,7 @@ impl Editor {
             should_quit: false,
             view: View::new(Pos2u {
                 x: terminal_size.x,
-                y: terminal_size.y - 1,
+                y: terminal_size.y.saturating_sub(1),
             }),
             status_bar_text: "Welcome to hecto".to_string(),
         }
@@ -70,7 +70,7 @@ impl Editor {
                 buffer,
                 Pos2u {
                     x: terminal_size.x,
-                    y: terminal_size.y - 1,
+                    y: terminal_size.y.saturating_sub(1),
                 },
             );
             self.status_bar_text = format!(r#""{filename}" opened"#);
@@ -136,7 +136,7 @@ impl Editor {
             Event::Resize(width, height) => {
                 self.view.resize(Pos2u {
                     x: (*width).into(),
-                    y: (*height - 1).into(),
+                    y: height.saturating_sub(1).into(),
                 });
                 true
             }
@@ -154,7 +154,7 @@ impl Editor {
             terminal::draw_text(
                 TerminalPos {
                     x: 0,
-                    y: size.y - 1,
+                    y: size.y.saturating_sub(1),
                 },
                 &self.status_bar_text,
             )?;

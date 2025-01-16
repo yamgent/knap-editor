@@ -75,8 +75,16 @@ impl View {
             .unwrap_or(Ok(()))?;
 
         Ok(TerminalPos {
-            x: (self.cursor_pos.x - self.scroll_offset.x).to_u16_clamp(),
-            y: (self.cursor_pos.y - self.scroll_offset.y).to_u16_clamp(),
+            x: self
+                .cursor_pos
+                .x
+                .saturating_sub(self.scroll_offset.x)
+                .to_u16_clamp(),
+            y: self
+                .cursor_pos
+                .y
+                .saturating_sub(self.scroll_offset.y)
+                .to_u16_clamp(),
         })
     }
 
@@ -89,38 +97,42 @@ impl View {
             self.scroll_offset.y = self.cursor_pos.y;
         }
 
-        if self.cursor_pos.x >= self.scroll_offset.x + self.size.x {
-            self.scroll_offset.x = self.cursor_pos.x - self.size.x + 1;
+        if self.cursor_pos.x >= self.scroll_offset.x.saturating_add(self.size.x) {
+            self.scroll_offset.x = self
+                .cursor_pos
+                .x
+                .saturating_sub(self.size.x)
+                .saturating_add(1);
         }
 
-        if self.cursor_pos.y >= self.scroll_offset.y + self.size.y {
-            self.scroll_offset.y = self.cursor_pos.y - self.size.y + 1;
+        if self.cursor_pos.y >= self.scroll_offset.y.saturating_add(self.size.y) {
+            self.scroll_offset.y = self
+                .cursor_pos
+                .y
+                .saturating_sub(self.size.y)
+                .saturating_add(1);
         }
     }
 
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
-                if self.cursor_pos.y > 0 {
-                    self.cursor_pos.y -= 1;
-                }
+                self.cursor_pos.y = self.cursor_pos.y.saturating_sub(1);
                 self.adjust_scroll_to_cursor_pos();
                 true
             }
             EditorCommand::MoveCursorDown => {
-                self.cursor_pos.y += 1;
+                self.cursor_pos.y = self.cursor_pos.y.saturating_add(1);
                 self.adjust_scroll_to_cursor_pos();
                 true
             }
             EditorCommand::MoveCursorLeft => {
-                if self.cursor_pos.x > 0 {
-                    self.cursor_pos.x -= 1;
-                }
+                self.cursor_pos.x = self.cursor_pos.x.saturating_sub(1);
                 self.adjust_scroll_to_cursor_pos();
                 true
             }
             EditorCommand::MoveCursorRight => {
-                self.cursor_pos.x += 1;
+                self.cursor_pos.x = self.cursor_pos.x.saturating_add(1);
                 self.adjust_scroll_to_cursor_pos();
                 true
             }

@@ -2,7 +2,9 @@
     clippy::all,
     clippy::pedantic,
     clippy::print_stdout,
-    clippy::as_conversions
+    clippy::arithmetic_side_effects,
+    clippy::as_conversions,
+    clippy::integer_division
 )]
 
 mod buffer;
