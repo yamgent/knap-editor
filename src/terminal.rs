@@ -3,6 +3,8 @@ use std::io::{self, Write};
 use anyhow::Result;
 use crossterm::{cursor, queue, style, terminal};
 
+use crate::math::Pos2u;
+
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalSize {
     pub x: u16,
@@ -58,6 +60,14 @@ pub fn size() -> Result<TerminalSize> {
     Ok(TerminalSize {
         x: size.0,
         y: size.1,
+    })
+}
+
+pub fn size_u64() -> Result<Pos2u> {
+    let size = terminal::size()?;
+    Ok(Pos2u {
+        x: size.0 as u64,
+        y: size.1 as u64,
     })
 }
 

@@ -5,8 +5,9 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 
 use crate::{
     buffer::Buffer,
-    terminal::{self, TerminalPos, TerminalSize},
-    view::View,
+    math::Pos2u,
+    terminal::{self, TerminalPos},
+    view::{View, ViewCommand},
 };
 
 fn setup_panic_hook() {
@@ -22,19 +23,17 @@ fn setup_panic_hook() {
 pub struct Editor {
     should_quit: bool,
 
-    cursor_pos: TerminalPos,
     view: View,
     status_bar_text: String,
 }
 
 impl Editor {
     pub fn new() -> Self {
-        let terminal_size = terminal::size().expect("able to get terminal size");
+        let terminal_size = terminal::size_u64().expect("able to get terminal size");
 
         Self {
             should_quit: false,
-            cursor_pos: TerminalPos { x: 0, y: 0 },
-            view: View::new(TerminalSize {
+            view: View::new(Pos2u {
                 x: terminal_size.x,
                 y: terminal_size.y - 1,
             }),
@@ -56,7 +55,7 @@ impl Editor {
     }
 
     fn open_arg_file(&mut self) -> Result<()> {
-        let terminal_size = terminal::size()?;
+        let terminal_size = terminal::size_u64()?;
 
         if let Some(filename) = std::env::args().nth(1) {
             let buffer = match Buffer::new_from_file(&filename) {
@@ -68,7 +67,7 @@ impl Editor {
             };
             self.view = View::new_with_buffer(
                 buffer,
-                TerminalSize {
+                Pos2u {
                     x: terminal_size.x,
                     y: terminal_size.y - 1,
                 },
@@ -95,52 +94,44 @@ impl Editor {
                 modifiers,
                 kind: KeyEventKind::Press,
                 ..
-            }) => {
-                let size = terminal::size()?;
-
-                match (code, modifiers) {
-                    (&KeyCode::Char('q'), &KeyModifiers::CONTROL) => {
-                        self.should_quit = true;
-                    }
-                    (&KeyCode::Left, _) => {
-                        if self.cursor_pos.x > 0 {
-                            self.cursor_pos.x -= 1;
-                        }
-                    }
-                    (&KeyCode::Right, _) => {
-                        if self.cursor_pos.x < size.x - 1 {
-                            self.cursor_pos.x += 1;
-                        }
-                    }
-                    (&KeyCode::Up, _) => {
-                        if self.cursor_pos.y > 0 {
-                            self.cursor_pos.y -= 1;
-                        }
-                    }
-                    (&KeyCode::Down, _) => {
-                        if self.cursor_pos.y < size.y - 1 {
-                            self.cursor_pos.y += 1;
-                        }
-                    }
-                    (&KeyCode::Home, _) => {
-                        self.cursor_pos.x = 0;
-                    }
-                    (&KeyCode::End, _) => {
-                        self.cursor_pos.x = size.x - 1;
-                    }
-                    (&KeyCode::PageUp, _) => {
-                        self.cursor_pos.y = 0;
-                    }
-                    (&KeyCode::PageDown, _) => {
-                        self.cursor_pos.y = size.y - 1;
-                    }
-                    _ => {}
+            }) => match (code, modifiers) {
+                (&KeyCode::Char('q'), &KeyModifiers::CONTROL) => {
+                    self.should_quit = true;
                 }
-            }
+                (&KeyCode::Up, _) => {
+                    self.view.execute_command(ViewCommand::MoveCursorUp);
+                }
+                (&KeyCode::Down, _) => {
+                    self.view.execute_command(ViewCommand::MoveCursorDown);
+                }
+                (&KeyCode::Left, _) => {
+                    self.view.execute_command(ViewCommand::MoveCursorLeft);
+                }
+                (&KeyCode::Right, _) => {
+                    self.view.execute_command(ViewCommand::MoveCursorRight);
+                }
+                (&KeyCode::Home, _) => {
+                    self.view
+                        .execute_command(ViewCommand::MoveCursorToStartOfLine);
+                }
+                (&KeyCode::End, _) => {
+                    self.view
+                        .execute_command(ViewCommand::MoveCursorToEndOfLine);
+                }
+                (&KeyCode::PageUp, _) => {
+                    self.view
+                        .execute_command(ViewCommand::MoveCursorToTopOfBuffer);
+                }
+                (&KeyCode::PageDown, _) => {
+                    self.view
+                        .execute_command(ViewCommand::MoveCursorToBottomOfBuffer);
+                }
+                _ => {}
+            },
             Event::Resize(width, height) => {
-                self.view.resize(TerminalSize {
-                    x: *width,
-                    y: *height - 1,
+                self.view.resize(Pos2u {
+                    x: *width as u64,
+                    y: (*height - 1) as u64,
                 });
             }
             _ => {}
@@ -152,7 +143,7 @@ impl Editor {
     fn draw(&self) -> Result<()> {
         let mut state = terminal::start_draw()?;
 
-        self.view.render()?;
+        let new_cursor_pos = self.view.render()?;
 
         if !self.status_bar_text.is_empty() {
             let size = terminal::size()?;
@@ -165,7 +156,7 @@ impl Editor {
             )?;
         }
 
-        state.cursor_pos = self.cursor_pos;
+        state.cursor_pos = new_cursor_pos;
 
         terminal::end_draw(&state)?;
         Ok(())
