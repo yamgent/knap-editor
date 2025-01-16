@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::{
     buffer::Buffer,
     commands::EditorCommand,
-    math::Pos2u,
+    math::{Pos2u, ToU16Clamp, ToU64, ToUsizeClamp},
     terminal::{self, TerminalPos},
 };
 
@@ -43,34 +43,30 @@ impl View {
         self.buffer
             .content
             .iter()
-            .skip(self.scroll_offset.y as usize)
-            .take(self.size.y as usize)
+            .skip(self.scroll_offset.y.to_usize_clamp())
+            .take(self.size.y.to_usize_clamp())
             .enumerate()
             .map(|(y, line)| {
                 terminal::draw_text(
                     TerminalPos {
                         x: 0,
-                        // y could not be bigger than size.y, which is u16
-                        #[allow(clippy::cast_possible_truncation)]
-                        y: y as u16,
+                        y: y.to_u16_clamp(),
                     },
                     line.chars()
-                        .skip(self.scroll_offset.x as usize)
-                        .take(self.size.x as usize)
+                        .skip(self.scroll_offset.x.to_usize_clamp())
+                        .take(self.size.x.to_usize_clamp())
                         .collect::<String>(),
                 )
             })
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 
-        (self.buffer.content.len()..(self.size.y as usize))
+        (self.buffer.content.len()..(self.size.y.to_usize_clamp()))
             .map(|y| {
                 terminal::draw_text(
                     TerminalPos {
                         x: 0,
-                        // y could not be bigger than size.y, which is u16
-                        #[allow(clippy::cast_possible_truncation)]
-                        y: y as u16,
+                        y: y.to_u16_clamp(),
                     },
                     "~",
                 )
@@ -79,8 +75,8 @@ impl View {
             .unwrap_or(Ok(()))?;
 
         Ok(TerminalPos {
-            x: (self.cursor_pos.x - self.scroll_offset.x) as u16,
-            y: (self.cursor_pos.y - self.scroll_offset.y) as u16,
+            x: (self.cursor_pos.x - self.scroll_offset.x).to_u16_clamp(),
+            y: (self.cursor_pos.y - self.scroll_offset.y).to_u16_clamp(),
         })
     }
 
@@ -109,47 +105,52 @@ impl View {
                     self.cursor_pos.y -= 1;
                 }
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
             EditorCommand::MoveCursorDown => {
                 self.cursor_pos.y += 1;
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
             EditorCommand::MoveCursorLeft => {
                 if self.cursor_pos.x > 0 {
                     self.cursor_pos.x -= 1;
                 }
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
             EditorCommand::MoveCursorRight => {
                 self.cursor_pos.x += 1;
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
             EditorCommand::MoveCursorToTopOfBuffer => {
                 self.cursor_pos.y = 0;
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
             EditorCommand::MoveCursorToBottomOfBuffer => {
-                self.cursor_pos.y = self.buffer.content.len() as u64;
+                self.cursor_pos.y = self.buffer.content.len().to_u64();
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
             EditorCommand::MoveCursorToStartOfLine => {
                 self.cursor_pos.x = 0;
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
             EditorCommand::MoveCursorToEndOfLine => {
-                self.cursor_pos.x =
-                    if let Some(line) = self.buffer.content.get(self.cursor_pos.y as usize) {
-                        (line.chars().count().saturating_sub(1)) as u64
-                    } else {
-                        0
-                    };
+                self.cursor_pos.x = if let Some(line) =
+                    self.buffer.content.get(self.cursor_pos.y.to_usize_clamp())
+                {
+                    line.chars().count().saturating_sub(1).to_u64()
+                } else {
+                    0
+                };
                 self.adjust_scroll_to_cursor_pos();
+                true
             }
-            _ => {
-                return false;
-            }
+            EditorCommand::QuitAll => false,
         }
-
-        true
     }
 }

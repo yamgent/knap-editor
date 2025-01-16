@@ -82,7 +82,7 @@ impl Editor {
     fn repl(&mut self) -> Result<()> {
         while !self.should_quit {
             let event = event::read()?;
-            self.handle_event(&event)?;
+            self.handle_event(&event);
             self.draw()?;
         }
         Ok(())
@@ -92,16 +92,13 @@ impl Editor {
         match command {
             EditorCommand::QuitAll => {
                 self.should_quit = true;
+                true
             }
-            _ => {
-                return self.view.execute_command(command);
-            }
+            _ => self.view.execute_command(command),
         }
-
-        true
     }
 
-    fn handle_event(&mut self, event: &Event) -> Result<()> {
+    fn handle_event(&mut self, event: &Event) -> bool {
         match event {
             Event::Key(KeyEvent {
                 code,
@@ -129,20 +126,22 @@ impl Editor {
                     }
                     _ => None,
                 };
+
                 if let Some(command) = command {
-                    self.execute_command(command);
+                    self.execute_command(command)
+                } else {
+                    false
                 }
             }
             Event::Resize(width, height) => {
                 self.view.resize(Pos2u {
-                    x: *width as u64,
-                    y: (*height - 1) as u64,
+                    x: (*width).into(),
+                    y: (*height - 1).into(),
                 });
+                true
             }
-            _ => {}
+            _ => false,
         }
-
-        Ok(())
     }
 
     fn draw(&self) -> Result<()> {

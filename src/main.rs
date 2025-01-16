@@ -1,4 +1,9 @@
-#![warn(clippy::all, clippy::pedantic, clippy::print_stdout)]
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::print_stdout,
+    clippy::as_conversions
+)]
 
 mod buffer;
 mod commands;

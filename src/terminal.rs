@@ -66,8 +66,8 @@ pub fn size() -> Result<TerminalSize> {
 pub fn size_u64() -> Result<Pos2u> {
     let size = terminal::size()?;
     Ok(Pos2u {
-        x: size.0 as u64,
-        y: size.1 as u64,
+        x: size.0.into(),
+        y: size.1.into(),
     })
 }
 
