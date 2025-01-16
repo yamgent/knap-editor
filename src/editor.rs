@@ -5,9 +5,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 
 use crate::{
     buffer::Buffer,
+    commands::EditorCommand,
     math::Pos2u,
     terminal::{self, TerminalPos},
-    view::{View, ViewCommand},
+    view::View,
 };
 
 fn setup_panic_hook() {
@@ -87,6 +88,19 @@ impl Editor {
         Ok(())
     }
 
+    fn execute_command(&mut self, command: EditorCommand) -> bool {
+        match command {
+            EditorCommand::QuitAll => {
+                self.should_quit = true;
+            }
+            _ => {
+                return self.view.execute_command(command);
+            }
+        }
+
+        true
+    }
+
     fn handle_event(&mut self, event: &Event) -> Result<()> {
         match event {
             Event::Key(KeyEvent {
@@ -94,40 +108,31 @@ impl Editor {
                 modifiers,
                 kind: KeyEventKind::Press,
                 ..
-            }) => match (code, modifiers) {
-                (&KeyCode::Char('q'), &KeyModifiers::CONTROL) => {
-                    self.should_quit = true;
+            }) => {
+                let command = match (modifiers, code) {
+                    (&KeyModifiers::CONTROL, &KeyCode::Char('q')) => Some(EditorCommand::QuitAll),
+                    (&KeyModifiers::NONE, &KeyCode::Up) => Some(EditorCommand::MoveCursorUp),
+                    (&KeyModifiers::NONE, &KeyCode::Down) => Some(EditorCommand::MoveCursorDown),
+                    (&KeyModifiers::NONE, &KeyCode::Left) => Some(EditorCommand::MoveCursorLeft),
+                    (&KeyModifiers::NONE, &KeyCode::Right) => Some(EditorCommand::MoveCursorRight),
+                    (&KeyModifiers::NONE, &KeyCode::Home) => {
+                        Some(EditorCommand::MoveCursorToStartOfLine)
+                    }
+                    (&KeyModifiers::NONE, &KeyCode::End) => {
+                        Some(EditorCommand::MoveCursorToEndOfLine)
+                    }
+                    (&KeyModifiers::NONE, &KeyCode::PageUp) => {
+                        Some(EditorCommand::MoveCursorToTopOfBuffer)
+                    }
+                    (&KeyModifiers::NONE, &KeyCode::PageDown) => {
+                        Some(EditorCommand::MoveCursorToBottomOfBuffer)
+                    }
+                    _ => None,
+                };
+                if let Some(command) = command {
+                    self.execute_command(command);
                 }
-                (&KeyCode::Up, _) => {
-                    self.view.execute_command(ViewCommand::MoveCursorUp);
-                }
-                (&KeyCode::Down, _) => {
-                    self.view.execute_command(ViewCommand::MoveCursorDown);
-                }
-                (&KeyCode::Left, _) => {
-                    self.view.execute_command(ViewCommand::MoveCursorLeft);
-                }
-                (&KeyCode::Right, _) => {
-                    self.view.execute_command(ViewCommand::MoveCursorRight);
-                }
-                (&KeyCode::Home, _) => {
-                    self.view
-                        .execute_command(ViewCommand::MoveCursorToStartOfLine);
-                }
-                (&KeyCode::End, _) => {
-                    self.view
-                        .execute_command(ViewCommand::MoveCursorToEndOfLine);
-                }
-                (&KeyCode::PageUp, _) => {
-                    self.view
-                        .execute_command(ViewCommand::MoveCursorToTopOfBuffer);
-                }
-                (&KeyCode::PageDown, _) => {
-                    self.view
-                        .execute_command(ViewCommand::MoveCursorToBottomOfBuffer);
-                }
-                _ => {}
-            },
+            }
             Event::Resize(width, height) => {
                 self.view.resize(Pos2u {
                     x: *width as u64,

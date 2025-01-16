@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::{
     buffer::Buffer,
+    commands::EditorCommand,
     math::Pos2u,
     terminal::{self, TerminalPos},
 };
@@ -12,18 +13,6 @@ pub struct View {
 
     cursor_pos: Pos2u,
     scroll_offset: Pos2u,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ViewCommand {
-    MoveCursorUp,
-    MoveCursorDown,
-    MoveCursorLeft,
-    MoveCursorRight,
-    MoveCursorToTopOfBuffer,
-    MoveCursorToBottomOfBuffer,
-    MoveCursorToStartOfLine,
-    MoveCursorToEndOfLine,
 }
 
 impl View {
@@ -113,41 +102,41 @@ impl View {
         }
     }
 
-    pub fn execute_command(&mut self, command: ViewCommand) {
+    pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         match command {
-            ViewCommand::MoveCursorUp => {
+            EditorCommand::MoveCursorUp => {
                 if self.cursor_pos.y > 0 {
                     self.cursor_pos.y -= 1;
                 }
                 self.adjust_scroll_to_cursor_pos();
             }
-            ViewCommand::MoveCursorDown => {
+            EditorCommand::MoveCursorDown => {
                 self.cursor_pos.y += 1;
                 self.adjust_scroll_to_cursor_pos();
             }
-            ViewCommand::MoveCursorLeft => {
+            EditorCommand::MoveCursorLeft => {
                 if self.cursor_pos.x > 0 {
                     self.cursor_pos.x -= 1;
                 }
                 self.adjust_scroll_to_cursor_pos();
             }
-            ViewCommand::MoveCursorRight => {
+            EditorCommand::MoveCursorRight => {
                 self.cursor_pos.x += 1;
                 self.adjust_scroll_to_cursor_pos();
             }
-            ViewCommand::MoveCursorToTopOfBuffer => {
+            EditorCommand::MoveCursorToTopOfBuffer => {
                 self.cursor_pos.y = 0;
                 self.adjust_scroll_to_cursor_pos();
             }
-            ViewCommand::MoveCursorToBottomOfBuffer => {
+            EditorCommand::MoveCursorToBottomOfBuffer => {
                 self.cursor_pos.y = self.buffer.content.len() as u64;
                 self.adjust_scroll_to_cursor_pos();
             }
-            ViewCommand::MoveCursorToStartOfLine => {
+            EditorCommand::MoveCursorToStartOfLine => {
                 self.cursor_pos.x = 0;
                 self.adjust_scroll_to_cursor_pos();
             }
-            ViewCommand::MoveCursorToEndOfLine => {
+            EditorCommand::MoveCursorToEndOfLine => {
                 self.cursor_pos.x =
                     if let Some(line) = self.buffer.content.get(self.cursor_pos.y as usize) {
                         (line.chars().count().saturating_sub(1)) as u64
@@ -156,6 +145,11 @@ impl View {
                     };
                 self.adjust_scroll_to_cursor_pos();
             }
+            _ => {
+                return false;
+            }
         }
+
+        true
     }
 }

@@ -1,5 +1,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::print_stdout)]
+
 mod buffer;
+mod commands;
 mod editor;
 mod math;
 mod terminal;
