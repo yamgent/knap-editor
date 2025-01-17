@@ -119,10 +119,10 @@ impl Editor {
                         Some(EditorCommand::MoveCursorToEndOfLine)
                     }
                     (&KeyModifiers::NONE, &KeyCode::PageUp) => {
-                        Some(EditorCommand::MoveCursorToTopOfBuffer)
+                        Some(EditorCommand::MoveCursorUpOnePage)
                     }
                     (&KeyModifiers::NONE, &KeyCode::PageDown) => {
-                        Some(EditorCommand::MoveCursorToBottomOfBuffer)
+                        Some(EditorCommand::MoveCursorDownOnePage)
                     }
                     _ => None,
                 };

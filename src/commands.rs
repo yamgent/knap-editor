@@ -5,8 +5,8 @@ pub enum EditorCommand {
     MoveCursorDown,
     MoveCursorLeft,
     MoveCursorRight,
-    MoveCursorToTopOfBuffer,
-    MoveCursorToBottomOfBuffer,
+    MoveCursorUpOnePage,
+    MoveCursorDownOnePage,
     MoveCursorToStartOfLine,
     MoveCursorToEndOfLine,
 }
