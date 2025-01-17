@@ -4,7 +4,7 @@ use crate::{
     buffer::Buffer,
     commands::EditorCommand,
     math::{Pos2u, ToU16Clamp, ToU64, ToUsizeClamp},
-    terminal::{self, TerminalPos},
+    terminal::TerminalPos,
 };
 
 pub struct View {
@@ -53,35 +53,15 @@ impl View {
     }
 
     pub fn render(&self) -> Result<TerminalPos> {
-        self.buffer
-            .content
-            .iter()
-            .skip(self.scroll_offset.y.to_usize_clamp())
-            .take(self.size.y.to_usize_clamp())
-            .enumerate()
-            .map(|(y, line)| {
-                terminal::draw_text(
-                    TerminalPos {
-                        x: 0,
-                        y: y.to_u16_clamp(),
-                    },
-                    line.chars()
-                        .skip(self.scroll_offset.x.to_usize_clamp())
-                        .take(self.size.x.to_usize_clamp())
-                        .collect::<String>(),
-                )
-            })
-            .find(Result::is_err)
-            .unwrap_or(Ok(()))?;
-
-        (self.buffer.content.len()..(self.size.y.to_usize_clamp()))
+        (0..self.size.y)
             .map(|y| {
-                terminal::draw_text(
+                self.buffer.render_line(
+                    (self.scroll_offset.y.saturating_add(y)).to_usize_clamp(),
                     TerminalPos {
                         x: 0,
                         y: y.to_u16_clamp(),
                     },
-                    "~",
+                    self.scroll_offset.x..(self.scroll_offset.x.saturating_add(self.size.x)),
                 )
             })
             .find(Result::is_err)
@@ -168,7 +148,7 @@ impl View {
                     .cursor_pos
                     .y
                     .saturating_add(1)
-                    .clamp(0, self.buffer.content.len().to_u64());
+                    .clamp(0, self.buffer.get_total_lines().to_u64());
                 self.adjust_scroll_to_cursor_pos();
                 self.adjust_cursor_x_on_cursor_y_movement();
                 true
@@ -197,7 +177,7 @@ impl View {
                     .to_u64();
 
                 if self.cursor_pos.x == line_len {
-                    if self.cursor_pos.y < self.buffer.content.len().to_u64() {
+                    if self.cursor_pos.y < self.buffer.get_total_lines().to_u64() {
                         self.cursor_pos.y = self.cursor_pos.y.saturating_add(1);
                         self.cursor_pos.x = 0;
                     }
@@ -220,7 +200,7 @@ impl View {
                     .cursor_pos
                     .y
                     .saturating_add(self.size.y)
-                    .clamp(0, self.buffer.content.len().to_u64());
+                    .clamp(0, self.buffer.get_total_lines().to_u64());
                 self.adjust_scroll_to_cursor_pos();
                 self.adjust_cursor_x_on_cursor_y_movement();
                 true
