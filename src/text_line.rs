@@ -43,18 +43,16 @@ fn get_grapheme_render_replacement<T: AsRef<str>>(grapheme: T) -> Option<(char, 
         _ => {
             if grapheme.trim().is_empty() {
                 Some(('␣', GraphemeWidth::Half))
+            } else if grapheme
+                .chars()
+                .next()
+                .map(|c| c.is_control())
+                .unwrap_or_default()
+                && grapheme.chars().nth(1).is_none()
+            {
+                Some(('▯', GraphemeWidth::Half))
             } else if grapheme.width() == 0 {
-                if grapheme
-                    .chars()
-                    .next()
-                    .map(|c| c.is_control())
-                    .unwrap_or_default()
-                    && grapheme.chars().nth(1).is_none()
-                {
-                    Some(('▯', GraphemeWidth::Half))
-                } else {
-                    Some(('·', GraphemeWidth::Half))
-                }
+                Some(('·', GraphemeWidth::Half))
             } else {
                 None
             }
