@@ -3,6 +3,8 @@ use std::io::{self, Write};
 use anyhow::Result;
 use crossterm::{cursor, queue, style, terminal};
 
+use crate::math::Pos2u;
+
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalSize {
     pub x: u16,
@@ -21,12 +23,17 @@ pub struct TerminalRestoreState {
 
 pub fn init_terminal() -> Result<()> {
     terminal::enable_raw_mode()?;
-    clear_screen()?;
+
+    queue!(io::stdout(), terminal::EnterAlternateScreen)?;
+    io::stdout().flush()?;
+
     Ok(())
 }
 
 pub fn end_terminal() -> Result<()> {
-    clear_screen()?;
+    queue!(io::stdout(), terminal::LeaveAlternateScreen)?;
+    io::stdout().flush()?;
+
     terminal::disable_raw_mode()?;
     Ok(())
 }
@@ -56,7 +63,15 @@ pub fn size() -> Result<TerminalSize> {
     })
 }
 
-pub fn hide_cursor() -> Result<()> {
+pub fn size_u64() -> Result<Pos2u> {
+    let size = terminal::size()?;
+    Ok(Pos2u {
+        x: size.0.into(),
+        y: size.1.into(),
+    })
+}
+
+fn hide_cursor() -> Result<()> {
     queue!(io::stdout(), cursor::Hide)?;
     Ok(())
 }
@@ -80,10 +95,4 @@ pub fn draw_text<T: AsRef<str>>(pos: TerminalPos, text: T) -> Result<()> {
 fn get_cursor_pos() -> Result<TerminalPos> {
     let pos = cursor::position()?;
     Ok(TerminalPos { x: pos.0, y: pos.1 })
-}
-
-fn clear_screen() -> Result<()> {
-    let state = start_draw()?;
-    end_draw(&state)?;
-    Ok(())
 }
