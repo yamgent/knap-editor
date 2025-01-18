@@ -4,10 +4,7 @@ use anyhow::Result;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    math::ToU16Clamp,
-    terminal::{self, TerminalPos},
-};
+use crate::terminal::{self, TerminalPos};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum GraphemeWidth {
@@ -105,8 +102,9 @@ impl TextLine {
 
     pub fn render_line(&self, screen_pos: TerminalPos, text_offset_x: Range<u64>) -> Result<()> {
         let mut current_x = 0;
-        let mut current_render_x = screen_pos.x;
         let mut fragment_iter = self.fragments.iter();
+
+        let mut chars_to_render = vec![];
 
         while current_x < text_offset_x.end {
             if let Some(current_fragment) = fragment_iter.next() {
@@ -114,38 +112,18 @@ impl TextLine {
 
                 if current_x < text_offset_x.start {
                     if next_x > text_offset_x.start {
-                        terminal::draw_text(
-                            TerminalPos {
-                                x: current_render_x,
-                                y: screen_pos.y,
-                            },
-                            "⋯",
-                        )?;
-                        current_render_x = current_render_x.saturating_add(1);
+                        chars_to_render.push("⋯".to_string());
                     }
                 } else if next_x > text_offset_x.end {
-                    terminal::draw_text(
-                        TerminalPos {
-                            x: current_render_x,
-                            y: screen_pos.y,
-                        },
-                        "⋯",
-                    )?;
-                    current_render_x = current_render_x.saturating_add(1);
+                    chars_to_render.push("⋯".to_string());
                 } else {
-                    terminal::draw_text(
-                        TerminalPos {
-                            x: current_render_x,
-                            y: screen_pos.y,
-                        },
+                    chars_to_render.push(
                         current_fragment
                             .replacement
                             .map_or(current_fragment.grapheme.to_string(), |replacement| {
                                 replacement.to_string()
                             }),
-                    )?;
-                    current_render_x = current_render_x
-                        .saturating_add(current_fragment.rendered_width.width().to_u16_clamp());
+                    );
                 }
 
                 current_x = next_x;
@@ -153,6 +131,16 @@ impl TextLine {
                 // ran out of characters
                 break;
             }
+        }
+
+        if !chars_to_render.is_empty() {
+            terminal::draw_text(
+                TerminalPos {
+                    x: screen_pos.x,
+                    y: screen_pos.y,
+                },
+                chars_to_render.into_iter().collect::<String>(),
+            )?;
         }
 
         Ok(())
