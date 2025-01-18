@@ -34,24 +34,60 @@ pub struct TextLine {
     fragments: Vec<TextFragment>,
 }
 
+fn get_grapheme_render_replacement<T: AsRef<str>>(grapheme: T) -> Option<(char, GraphemeWidth)> {
+    let grapheme = grapheme.as_ref();
+
+    match grapheme {
+        " " => None,
+        "\t" => Some((' ', GraphemeWidth::Half)),
+        _ => {
+            if grapheme.trim().is_empty() {
+                Some(('␣', GraphemeWidth::Half))
+            } else if grapheme.width() == 0 {
+                if grapheme
+                    .chars()
+                    .next()
+                    .map(|c| c.is_control())
+                    .unwrap_or_default()
+                    && grapheme.chars().nth(1).is_none()
+                {
+                    Some(('▯', GraphemeWidth::Half))
+                } else {
+                    Some(('·', GraphemeWidth::Half))
+                }
+            } else {
+                None
+            }
+        }
+    }
+}
+
 impl TextLine {
     pub fn new<T: AsRef<str>>(content: T) -> Self {
         Self {
             fragments: content
                 .as_ref()
                 .graphemes(true)
-                .map(|grapheme| TextFragment {
-                    grapheme: grapheme.to_string(),
-                    rendered_width: if grapheme.width() <= 1 {
-                        GraphemeWidth::Half
+                .map(|grapheme| {
+                    if let Some((replacement, rendered_width)) =
+                        get_grapheme_render_replacement(grapheme)
+                    {
+                        TextFragment {
+                            grapheme: grapheme.to_string(),
+                            rendered_width,
+                            replacement: Some(replacement),
+                        }
                     } else {
-                        GraphemeWidth::Full
-                    },
-                    replacement: if grapheme.width() == 0 {
-                        Some('·')
-                    } else {
-                        None
-                    },
+                        TextFragment {
+                            grapheme: grapheme.to_string(),
+                            rendered_width: if grapheme.width() <= 1 {
+                                GraphemeWidth::Half
+                            } else {
+                                GraphemeWidth::Full
+                            },
+                            replacement: None,
+                        }
+                    }
                 })
                 .collect(),
         }
