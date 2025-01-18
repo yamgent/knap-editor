@@ -16,15 +16,11 @@ enum GraphemeWidth {
 }
 
 impl GraphemeWidth {
-    fn width(&self) -> u64 {
+    fn width(self) -> u64 {
         match self {
             GraphemeWidth::Half => 1,
             GraphemeWidth::Full => 2,
         }
-    }
-
-    fn increment(&self, x: u64) -> u64 {
-        x.saturating_add(self.width())
     }
 }
 
@@ -80,7 +76,7 @@ impl TextLine {
 
         while current_x < text_offset_x.end {
             if let Some(current_fragment) = fragment_iter.next() {
-                let next_x = current_fragment.rendered_width.increment(current_x);
+                let next_x = current_x.saturating_add(current_fragment.rendered_width.width());
 
                 if current_x < text_offset_x.start {
                     if next_x > text_offset_x.start {
@@ -93,31 +89,29 @@ impl TextLine {
                         )?;
                         current_render_x = current_render_x.saturating_add(1);
                     }
+                } else if next_x > text_offset_x.end {
+                    terminal::draw_text(
+                        TerminalPos {
+                            x: current_render_x,
+                            y: screen_pos.y,
+                        },
+                        "⋯",
+                    )?;
+                    current_render_x = current_render_x.saturating_add(1);
                 } else {
-                    if next_x > text_offset_x.end {
-                        terminal::draw_text(
-                            TerminalPos {
-                                x: current_render_x,
-                                y: screen_pos.y,
-                            },
-                            "⋯",
-                        )?;
-                        current_render_x = current_render_x.saturating_add(1);
-                    } else {
-                        terminal::draw_text(
-                            TerminalPos {
-                                x: current_render_x,
-                                y: screen_pos.y,
-                            },
-                            current_fragment
-                                .replacement
-                                .map_or(current_fragment.grapheme.to_string(), |replacement| {
-                                    replacement.to_string()
-                                }),
-                        )?;
-                        current_render_x = current_render_x
-                            .saturating_add(current_fragment.rendered_width.width().to_u16_clamp());
-                    }
+                    terminal::draw_text(
+                        TerminalPos {
+                            x: current_render_x,
+                            y: screen_pos.y,
+                        },
+                        current_fragment
+                            .replacement
+                            .map_or(current_fragment.grapheme.to_string(), |replacement| {
+                                replacement.to_string()
+                            }),
+                    )?;
+                    current_render_x = current_render_x
+                        .saturating_add(current_fragment.rendered_width.width().to_u16_clamp());
                 }
 
                 current_x = next_x;

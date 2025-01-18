@@ -92,7 +92,7 @@ impl View {
         let screen_x = self.get_screen_x_pos_from_caret_x_pos();
 
         if screen_x < self.scroll_offset.x.to_u16_clamp() {
-            self.scroll_offset.x = screen_x as u64;
+            self.scroll_offset.x = u64::from(screen_x);
         }
 
         if self.caret_pos.y < self.scroll_offset.y {
@@ -106,9 +106,11 @@ impl View {
                 .saturating_add(self.size.x)
                 .to_u16_clamp()
         {
-            self.scroll_offset.x = screen_x
-                .saturating_sub(self.size.x.to_u16_clamp())
-                .saturating_add(1) as u64;
+            self.scroll_offset.x = u64::from(
+                screen_x
+                    .saturating_sub(self.size.x.to_u16_clamp())
+                    .saturating_add(1),
+            );
         }
 
         if self.caret_pos.y >= self.scroll_offset.y.saturating_add(self.size.y) {
