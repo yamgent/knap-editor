@@ -11,7 +11,7 @@ pub struct View {
     buffer: Buffer,
     size: Pos2u,
 
-    cursor_pos: Pos2u,
+    text_cursor_pos: Pos2u,
     scroll_offset: Pos2u,
 
     /// When the cursor moves between the lines on the y-axis
@@ -31,7 +31,7 @@ impl View {
         Self {
             buffer: Buffer::new(),
             size,
-            cursor_pos: Pos2u::ZERO,
+            text_cursor_pos: Pos2u::ZERO,
             scroll_offset: Pos2u::ZERO,
             previous_line_cursor_max_x: None,
         }
@@ -41,10 +41,19 @@ impl View {
         Self {
             buffer,
             size,
-            cursor_pos: Pos2u::ZERO,
+            text_cursor_pos: Pos2u::ZERO,
             scroll_offset: Pos2u::ZERO,
             previous_line_cursor_max_x: None,
         }
+    }
+
+    fn get_terminal_x_pos_from_text_cursor_x_pos(&self) -> u16 {
+        self.buffer
+            .get_line_text_width(
+                self.text_cursor_pos.y.to_usize_clamp(),
+                self.text_cursor_pos.x.to_usize_clamp(),
+            )
+            .to_u16_clamp()
     }
 
     pub fn resize(&mut self, size: Pos2u) {
@@ -69,12 +78,10 @@ impl View {
 
         Ok(TerminalPos {
             x: self
-                .cursor_pos
-                .x
-                .saturating_sub(self.scroll_offset.x)
-                .to_u16_clamp(),
+                .get_terminal_x_pos_from_text_cursor_x_pos()
+                .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
             y: self
-                .cursor_pos
+                .text_cursor_pos
                 .y
                 .saturating_sub(self.scroll_offset.y)
                 .to_u16_clamp(),
@@ -82,25 +89,31 @@ impl View {
     }
 
     fn adjust_scroll_to_cursor_pos(&mut self) {
-        if self.cursor_pos.x < self.scroll_offset.x {
-            self.scroll_offset.x = self.cursor_pos.x;
+        let terminal_x = self.get_terminal_x_pos_from_text_cursor_x_pos();
+
+        if terminal_x < self.scroll_offset.x.to_u16_clamp() {
+            self.scroll_offset.x = terminal_x as u64;
         }
 
-        if self.cursor_pos.y < self.scroll_offset.y {
-            self.scroll_offset.y = self.cursor_pos.y;
+        if self.text_cursor_pos.y < self.scroll_offset.y {
+            self.scroll_offset.y = self.text_cursor_pos.y;
         }
 
-        if self.cursor_pos.x >= self.scroll_offset.x.saturating_add(self.size.x) {
-            self.scroll_offset.x = self
-                .cursor_pos
+        if terminal_x
+            >= self
+                .scroll_offset
                 .x
-                .saturating_sub(self.size.x)
-                .saturating_add(1);
+                .saturating_add(self.size.x)
+                .to_u16_clamp()
+        {
+            self.scroll_offset.x = terminal_x
+                .saturating_sub(self.size.x.to_u16_clamp())
+                .saturating_add(1) as u64;
         }
 
-        if self.cursor_pos.y >= self.scroll_offset.y.saturating_add(self.size.y) {
+        if self.text_cursor_pos.y >= self.scroll_offset.y.saturating_add(self.size.y) {
             self.scroll_offset.y = self
-                .cursor_pos
+                .text_cursor_pos
                 .y
                 .saturating_sub(self.size.y)
                 .saturating_add(1);
@@ -112,23 +125,23 @@ impl View {
     pub fn adjust_cursor_x_on_cursor_y_movement(&mut self) {
         let line_len = self
             .buffer
-            .get_line_len(self.cursor_pos.y.to_usize_clamp())
+            .get_line_len(self.text_cursor_pos.y.to_usize_clamp())
             .to_u64();
 
-        if self.cursor_pos.x > line_len {
+        if self.text_cursor_pos.x > line_len {
             // x is not on a valid position, move it back
             if self.previous_line_cursor_max_x.is_none() {
-                self.previous_line_cursor_max_x = Some(self.cursor_pos.x);
+                self.previous_line_cursor_max_x = Some(self.text_cursor_pos.x);
             }
-            self.cursor_pos.x = line_len;
+            self.text_cursor_pos.x = line_len;
         } else {
             // check to see if we have previous memory of x
             if let Some(previous_x) = self.previous_line_cursor_max_x {
                 if previous_x > line_len {
                     // previous entry still too far out...
-                    self.cursor_pos.x = line_len;
+                    self.text_cursor_pos.x = line_len;
                 } else {
-                    self.cursor_pos.x = previous_x;
+                    self.text_cursor_pos.x = previous_x;
                     self.previous_line_cursor_max_x = None;
                 }
             }
@@ -138,14 +151,14 @@ impl View {
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
-                self.cursor_pos.y = self.cursor_pos.y.saturating_sub(1);
+                self.text_cursor_pos.y = self.text_cursor_pos.y.saturating_sub(1);
                 self.adjust_scroll_to_cursor_pos();
                 self.adjust_cursor_x_on_cursor_y_movement();
                 true
             }
             EditorCommand::MoveCursorDown => {
-                self.cursor_pos.y = self
-                    .cursor_pos
+                self.text_cursor_pos.y = self
+                    .text_cursor_pos
                     .y
                     .saturating_add(1)
                     .clamp(0, self.buffer.get_total_lines().to_u64());
@@ -154,16 +167,16 @@ impl View {
                 true
             }
             EditorCommand::MoveCursorLeft => {
-                if self.cursor_pos.x == 0 {
-                    if self.cursor_pos.y > 0 {
-                        self.cursor_pos.y = self.cursor_pos.y.saturating_sub(1);
-                        self.cursor_pos.x = self
+                if self.text_cursor_pos.x == 0 {
+                    if self.text_cursor_pos.y > 0 {
+                        self.text_cursor_pos.y = self.text_cursor_pos.y.saturating_sub(1);
+                        self.text_cursor_pos.x = self
                             .buffer
-                            .get_line_len(self.cursor_pos.y.to_usize_clamp())
+                            .get_line_len(self.text_cursor_pos.y.to_usize_clamp())
                             .to_u64();
                     }
                 } else {
-                    self.cursor_pos.x = self.cursor_pos.x.saturating_sub(1);
+                    self.text_cursor_pos.x = self.text_cursor_pos.x.saturating_sub(1);
                 }
 
                 self.adjust_scroll_to_cursor_pos();
@@ -173,16 +186,16 @@ impl View {
             EditorCommand::MoveCursorRight => {
                 let line_len = self
                     .buffer
-                    .get_line_len(self.cursor_pos.y.to_usize_clamp())
+                    .get_line_len(self.text_cursor_pos.y.to_usize_clamp())
                     .to_u64();
 
-                if self.cursor_pos.x == line_len {
-                    if self.cursor_pos.y < self.buffer.get_total_lines().to_u64() {
-                        self.cursor_pos.y = self.cursor_pos.y.saturating_add(1);
-                        self.cursor_pos.x = 0;
+                if self.text_cursor_pos.x == line_len {
+                    if self.text_cursor_pos.y < self.buffer.get_total_lines().to_u64() {
+                        self.text_cursor_pos.y = self.text_cursor_pos.y.saturating_add(1);
+                        self.text_cursor_pos.x = 0;
                     }
                 } else {
-                    self.cursor_pos.x = self.cursor_pos.x.saturating_add(1);
+                    self.text_cursor_pos.x = self.text_cursor_pos.x.saturating_add(1);
                 }
 
                 self.adjust_scroll_to_cursor_pos();
@@ -190,14 +203,14 @@ impl View {
                 true
             }
             EditorCommand::MoveCursorUpOnePage => {
-                self.cursor_pos.y = self.cursor_pos.y.saturating_sub(self.size.y);
+                self.text_cursor_pos.y = self.text_cursor_pos.y.saturating_sub(self.size.y);
                 self.adjust_scroll_to_cursor_pos();
                 self.adjust_cursor_x_on_cursor_y_movement();
                 true
             }
             EditorCommand::MoveCursorDownOnePage => {
-                self.cursor_pos.y = self
-                    .cursor_pos
+                self.text_cursor_pos.y = self
+                    .text_cursor_pos
                     .y
                     .saturating_add(self.size.y)
                     .clamp(0, self.buffer.get_total_lines().to_u64());
@@ -206,15 +219,15 @@ impl View {
                 true
             }
             EditorCommand::MoveCursorToStartOfLine => {
-                self.cursor_pos.x = 0;
+                self.text_cursor_pos.x = 0;
                 self.adjust_scroll_to_cursor_pos();
                 self.previous_line_cursor_max_x.take();
                 true
             }
             EditorCommand::MoveCursorToEndOfLine => {
-                self.cursor_pos.x = self
+                self.text_cursor_pos.x = self
                     .buffer
-                    .get_line_len(self.cursor_pos.y.to_usize_clamp())
+                    .get_line_len(self.text_cursor_pos.y.to_usize_clamp())
                     .to_u64();
                 self.adjust_scroll_to_cursor_pos();
                 self.previous_line_cursor_max_x.take();

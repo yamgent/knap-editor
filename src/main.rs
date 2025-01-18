@@ -12,6 +12,7 @@ mod commands;
 mod editor;
 mod math;
 mod terminal;
+mod text_line;
 mod view;
 
 use editor::Editor;
