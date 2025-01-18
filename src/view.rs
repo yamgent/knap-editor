@@ -9,8 +9,8 @@ use crate::{
 
 pub struct View {
     buffer: Buffer,
-    size: Pos2u,
 
+    size: Pos2u,
     caret_pos: Pos2u,
     scroll_offset: Pos2u,
 
@@ -37,23 +37,18 @@ impl View {
         }
     }
 
-    pub fn new_with_buffer(buffer: Buffer, size: Pos2u) -> Self {
-        Self {
-            buffer,
-            size,
-            caret_pos: Pos2u::ZERO,
-            scroll_offset: Pos2u::ZERO,
-            previous_line_caret_max_x: None,
-        }
+    pub fn replace_buffer(&mut self, buffer: Buffer) {
+        self.buffer = buffer;
     }
 
-    fn get_screen_x_pos_from_caret_x_pos(&self) -> u16 {
-        self.buffer
-            .get_line_text_width(
-                self.caret_pos.y.to_usize_clamp(),
-                self.caret_pos.x.to_usize_clamp(),
-            )
-            .to_u16_clamp()
+    fn get_screen_pos_from_caret_pos(&self, caret_pos: Pos2u) -> TerminalPos {
+        TerminalPos {
+            x: self
+                .buffer
+                .get_line_text_width(caret_pos.y.to_usize_clamp(), caret_pos.x.to_usize_clamp())
+                .to_u16_clamp(),
+            y: caret_pos.y.to_u16_clamp(),
+        }
     }
 
     pub fn resize(&mut self, size: Pos2u) {
@@ -76,30 +71,30 @@ impl View {
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 
+        let screen_cursor_pos = self.get_screen_pos_from_caret_pos(self.caret_pos);
+
         Ok(TerminalPos {
-            x: self
-                .get_screen_x_pos_from_caret_x_pos()
+            x: screen_cursor_pos
+                .x
                 .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
-            y: self
-                .caret_pos
+            y: screen_cursor_pos
                 .y
-                .saturating_sub(self.scroll_offset.y)
-                .to_u16_clamp(),
+                .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
         })
     }
 
     fn adjust_scroll_to_caret_screen_pos(&mut self) {
-        let screen_x = self.get_screen_x_pos_from_caret_x_pos();
+        let screen_cursor_pos = self.get_screen_pos_from_caret_pos(self.caret_pos);
 
-        if screen_x < self.scroll_offset.x.to_u16_clamp() {
-            self.scroll_offset.x = u64::from(screen_x);
+        if screen_cursor_pos.x < self.scroll_offset.x.to_u16_clamp() {
+            self.scroll_offset.x = u64::from(screen_cursor_pos.x);
         }
 
-        if self.caret_pos.y < self.scroll_offset.y {
-            self.scroll_offset.y = self.caret_pos.y;
+        if screen_cursor_pos.y < self.scroll_offset.y.to_u16_clamp() {
+            self.scroll_offset.y = u64::from(screen_cursor_pos.y);
         }
 
-        if screen_x
+        if screen_cursor_pos.x
             >= self
                 .scroll_offset
                 .x
@@ -107,18 +102,26 @@ impl View {
                 .to_u16_clamp()
         {
             self.scroll_offset.x = u64::from(
-                screen_x
+                screen_cursor_pos
+                    .x
                     .saturating_sub(self.size.x.to_u16_clamp())
                     .saturating_add(1),
             );
         }
 
-        if self.caret_pos.y >= self.scroll_offset.y.saturating_add(self.size.y) {
-            self.scroll_offset.y = self
-                .caret_pos
+        if screen_cursor_pos.y
+            >= self
+                .scroll_offset
                 .y
-                .saturating_sub(self.size.y)
-                .saturating_add(1);
+                .saturating_add(self.size.y)
+                .to_u16_clamp()
+        {
+            self.scroll_offset.y = u64::from(
+                screen_cursor_pos
+                    .y
+                    .saturating_sub(self.size.y.to_u16_clamp())
+                    .saturating_add(1),
+            );
         }
     }
 

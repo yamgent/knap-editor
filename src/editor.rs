@@ -47,7 +47,7 @@ impl Editor {
 
         terminal::init_terminal().expect("able to initialize terminal");
 
-        self.open_arg_file().expect("open file has no fatal error");
+        self.open_arg_file();
 
         let repl_result = self.repl();
 
@@ -55,28 +55,18 @@ impl Editor {
         repl_result.expect("repl has no fatal error");
     }
 
-    fn open_arg_file(&mut self) -> Result<()> {
-        let terminal_size = terminal::size_u64()?;
-
+    fn open_arg_file(&mut self) {
         if let Some(filename) = std::env::args().nth(1) {
             let buffer = match Buffer::new_from_file(&filename) {
                 Ok(buffer) => buffer,
                 Err(err) => {
                     self.status_bar_text = format!("Cannot load {filename}: {err}");
-                    return Ok(());
+                    return;
                 }
             };
-            self.view = View::new_with_buffer(
-                buffer,
-                Pos2u {
-                    x: terminal_size.x,
-                    y: terminal_size.y.saturating_sub(1),
-                },
-            );
+            self.view.replace_buffer(buffer);
             self.status_bar_text = format!(r#""{filename}" opened"#);
         }
-
-        Ok(())
     }
 
     fn repl(&mut self) -> Result<()> {
