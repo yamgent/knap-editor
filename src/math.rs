@@ -16,7 +16,6 @@ where
     /// lint error, as `Self` may have more bits than `usize`. When that happens,
     /// then we clamp the value to `usize::MAX`
     fn to_usize_clamp(self) -> usize {
-        assert!(std::mem::size_of::<usize>() == 8);
         self.try_into().unwrap_or(usize::MAX)
     }
 }
