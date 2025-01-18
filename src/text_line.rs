@@ -41,7 +41,9 @@ pub struct TextLine {
 impl TextLine {
     pub fn new<T: AsRef<str>>(content: T) -> Self {
         Self {
-            fragments: UnicodeSegmentation::graphemes(content.as_ref(), true)
+            fragments: content
+                .as_ref()
+                .graphemes(true)
                 .map(|grapheme| TextFragment {
                     grapheme: grapheme.to_string(),
                     rendered_width: if grapheme.width() <= 1 {
@@ -49,7 +51,11 @@ impl TextLine {
                     } else {
                         GraphemeWidth::Full
                     },
-                    replacement: if grapheme == "\x1b" { Some('·') } else { None },
+                    replacement: if grapheme.width() == 0 {
+                        Some('·')
+                    } else {
+                        None
+                    },
                 })
                 .collect(),
         }
