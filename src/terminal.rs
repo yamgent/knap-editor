@@ -71,7 +71,7 @@ pub fn size_u64() -> Result<Pos2u> {
     })
 }
 
-pub fn hide_cursor() -> Result<()> {
+fn hide_cursor() -> Result<()> {
     queue!(io::stdout(), cursor::Hide)?;
     Ok(())
 }
