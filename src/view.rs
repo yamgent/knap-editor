@@ -238,6 +238,23 @@ impl View {
                 self.previous_line_caret_max_x.take();
                 true
             }
+            EditorCommand::InsertCharacter(ch) => {
+                match self.buffer.insert_character(
+                    self.caret_pos.y.to_usize_clamp(),
+                    self.caret_pos.x.to_usize_clamp(),
+                    ch,
+                ) {
+                    Ok(result) => {
+                        if result.line_len_increased {
+                            self.caret_pos.x = self.caret_pos.x.saturating_add(1);
+                            self.adjust_scroll_to_caret_screen_pos();
+                        }
+                        self.previous_line_caret_max_x.take();
+                        true
+                    }
+                    Err(..) => false,
+                }
+            }
             EditorCommand::QuitAll => false,
         }
     }

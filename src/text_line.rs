@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{error::Error, fmt::Display, ops::Range};
 
 use anyhow::Result;
 use unicode_segmentation::UnicodeSegmentation;
@@ -31,6 +31,33 @@ pub struct TextLine {
     fragments: Vec<TextFragment>,
 }
 
+pub struct InsertCharResult {
+    /// There could be scenarios where an insertion of
+    /// a new character results in grapheme clusters
+    /// merging together. In those situations, the line
+    /// length would not increase, and this value would
+    /// be false. Therefore the caret position should
+    /// not change.
+    ///
+    /// Otherwise, if there's a length increase, then
+    /// the caret position should change, and this
+    /// value would be true.
+    pub line_len_increased: bool,
+}
+
+#[derive(Debug)]
+pub enum InsertCharError {
+    InvalidPosition,
+}
+
+impl Display for InsertCharError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl Error for InsertCharError {}
+
 fn get_grapheme_render_replacement<T: AsRef<str>>(grapheme: T) -> Option<(char, GraphemeWidth)> {
     let grapheme = grapheme.as_ref();
 
@@ -53,34 +80,36 @@ fn get_grapheme_render_replacement<T: AsRef<str>>(grapheme: T) -> Option<(char, 
     }
 }
 
+fn build_fragments_from_string<T: AsRef<str>>(content: T) -> Vec<TextFragment> {
+    content
+        .as_ref()
+        .graphemes(true)
+        .map(|grapheme| {
+            if let Some((replacement, rendered_width)) = get_grapheme_render_replacement(grapheme) {
+                TextFragment {
+                    grapheme: grapheme.to_string(),
+                    rendered_width,
+                    replacement: Some(replacement),
+                }
+            } else {
+                TextFragment {
+                    grapheme: grapheme.to_string(),
+                    rendered_width: if grapheme.width() <= 1 {
+                        GraphemeWidth::Half
+                    } else {
+                        GraphemeWidth::Full
+                    },
+                    replacement: None,
+                }
+            }
+        })
+        .collect()
+}
+
 impl TextLine {
     pub fn new<T: AsRef<str>>(content: T) -> Self {
         Self {
-            fragments: content
-                .as_ref()
-                .graphemes(true)
-                .map(|grapheme| {
-                    if let Some((replacement, rendered_width)) =
-                        get_grapheme_render_replacement(grapheme)
-                    {
-                        TextFragment {
-                            grapheme: grapheme.to_string(),
-                            rendered_width,
-                            replacement: Some(replacement),
-                        }
-                    } else {
-                        TextFragment {
-                            grapheme: grapheme.to_string(),
-                            rendered_width: if grapheme.width() <= 1 {
-                                GraphemeWidth::Half
-                            } else {
-                                GraphemeWidth::Full
-                            },
-                            replacement: None,
-                        }
-                    }
-                })
-                .collect(),
+            fragments: build_fragments_from_string(content),
         }
     }
 
@@ -140,5 +169,37 @@ impl TextLine {
         }
 
         Ok(())
+    }
+
+    pub fn insert_character(
+        &mut self,
+        fragment_idx: usize,
+        character: char,
+    ) -> Result<InsertCharResult, InsertCharError> {
+        if fragment_idx > self.fragments.len() {
+            Err(InsertCharError::InvalidPosition)
+        } else {
+            let old_fragments_len = self.fragments.len();
+
+            let mut new_string = self
+                .fragments
+                .iter()
+                .take(fragment_idx)
+                .map(|fragment| fragment.grapheme.clone())
+                .collect::<String>();
+            new_string.push(character);
+            new_string.extend(
+                self.fragments
+                    .iter()
+                    .skip(fragment_idx)
+                    .map(|fragment| fragment.grapheme.clone()),
+            );
+
+            self.fragments = build_fragments_from_string(new_string);
+
+            Ok(InsertCharResult {
+                line_len_increased: self.fragments.len() > old_fragments_len,
+            })
+        }
     }
 }

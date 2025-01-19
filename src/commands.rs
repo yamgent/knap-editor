@@ -9,4 +9,5 @@ pub enum EditorCommand {
     MoveCursorDownOnePage,
     MoveCursorToStartOfLine,
     MoveCursorToEndOfLine,
+    InsertCharacter(char),
 }

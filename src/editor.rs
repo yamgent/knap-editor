@@ -114,6 +114,13 @@ impl Editor {
                     (&KeyModifiers::NONE, &KeyCode::PageDown) => {
                         Some(EditorCommand::MoveCursorDownOnePage)
                     }
+                    (&KeyModifiers::NONE | &KeyModifiers::SHIFT, &KeyCode::Char(ch)) => {
+                        // NOTE: for SHIFT case, crossterm automatically
+                        // converts ch to uppercase for us already. This
+                        // also means we do not need to manually handle
+                        // capslock scenario
+                        Some(EditorCommand::InsertCharacter(ch))
+                    }
                     _ => None,
                 };
 

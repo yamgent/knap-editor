@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{
     terminal::{self, TerminalPos},
-    text_line::TextLine,
+    text_line::{InsertCharError, InsertCharResult, TextLine},
 };
 
 pub struct Buffer {
@@ -24,13 +24,13 @@ impl Buffer {
         })
     }
 
-    pub fn get_line_len(&self, idx: usize) -> usize {
-        self.content.get(idx).map_or(0, TextLine::get_line_len)
+    pub fn get_line_len(&self, line_idx: usize) -> usize {
+        self.content.get(line_idx).map_or(0, TextLine::get_line_len)
     }
 
-    pub fn get_line_text_width(&self, idx: usize, end_x: usize) -> u64 {
+    pub fn get_line_text_width(&self, line_idx: usize, end_x: usize) -> u64 {
         self.content
-            .get(idx)
+            .get(line_idx)
             .map_or(0, |line| line.get_line_text_width(end_x))
     }
 
@@ -47,6 +47,25 @@ impl Buffer {
         match self.content.get(line_idx) {
             Some(line) => line.render_line(screen_pos, text_offset_x),
             None => terminal::draw_text(screen_pos, "~"),
+        }
+    }
+
+    pub fn insert_character(
+        &mut self,
+        line_idx: usize,
+        fragment_idx: usize,
+        character: char,
+    ) -> Result<InsertCharResult, InsertCharError> {
+        if line_idx == self.content.len() {
+            self.content.push(TextLine::new(character.to_string()));
+            Ok(InsertCharResult {
+                line_len_increased: true,
+            })
+        } else {
+            match self.content.get_mut(line_idx) {
+                Some(line) => line.insert_character(fragment_idx, character),
+                None => Err(InsertCharError::InvalidPosition),
+            }
         }
     }
 }
