@@ -68,4 +68,10 @@ impl Buffer {
             }
         }
     }
+
+    pub fn remove_character(&mut self, line_idx: usize, fragment_idx: usize) {
+        if let Some(line) = self.content.get_mut(line_idx) {
+            line.remove_character(fragment_idx);
+        }
+    }
 }

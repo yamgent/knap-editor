@@ -121,6 +121,12 @@ impl Editor {
                         // capslock scenario
                         Some(EditorCommand::InsertCharacter(ch))
                     }
+                    (&KeyModifiers::NONE, &KeyCode::Backspace) => {
+                        Some(EditorCommand::EraseCharacterBeforeCursor)
+                    }
+                    (&KeyModifiers::NONE, &KeyCode::Delete) => {
+                        Some(EditorCommand::EraseCharacterAfterCursor)
+                    }
                     _ => None,
                 };
 

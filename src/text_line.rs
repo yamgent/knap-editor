@@ -202,4 +202,17 @@ impl TextLine {
             })
         }
     }
+
+    pub fn remove_character(&mut self, fragment_idx: usize) {
+        if fragment_idx < self.fragments.len() {
+            let new_string = self
+                .fragments
+                .iter()
+                .enumerate()
+                .filter(|(idx, _)| *idx != fragment_idx)
+                .map(|(_, fragment)| fragment.grapheme.clone())
+                .collect::<String>();
+            self.fragments = build_fragments_from_string(new_string);
+        }
+    }
 }

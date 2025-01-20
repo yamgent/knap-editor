@@ -255,6 +255,35 @@ impl View {
                     Err(..) => false,
                 }
             }
+            EditorCommand::EraseCharacterBeforeCursor => {
+                if self.caret_pos.x > 0 {
+                    self.buffer.remove_character(
+                        self.caret_pos.y.to_usize_clamp(),
+                        self.caret_pos.x.saturating_sub(1).to_usize_clamp(),
+                    );
+                    self.caret_pos.x = self.caret_pos.x.saturating_sub(1);
+                }
+
+                self.adjust_scroll_to_caret_screen_pos();
+                self.previous_line_caret_max_x.take();
+                true
+            }
+            EditorCommand::EraseCharacterAfterCursor => {
+                if self.caret_pos.x
+                    < self
+                        .buffer
+                        .get_line_len(self.caret_pos.y.to_usize_clamp())
+                        .to_u64()
+                {
+                    self.buffer.remove_character(
+                        self.caret_pos.y.to_usize_clamp(),
+                        self.caret_pos.x.to_usize_clamp(),
+                    );
+                }
+
+                self.previous_line_caret_max_x.take();
+                true
+            }
             EditorCommand::QuitAll => false,
         }
     }
