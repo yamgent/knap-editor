@@ -171,6 +171,8 @@ impl View {
         self.previous_line_caret_max_x.take();
     }
 
+    // splitting the function up doesn't change the readability much
+    #[allow(clippy::too_many_lines)]
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
