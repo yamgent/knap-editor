@@ -127,7 +127,7 @@ impl View {
 
     /// See `Self::previous_line_caret_max_x` for more details about the purpose
     /// of this function.
-    pub fn adjust_caret_x_on_caret_y_movement(&mut self) {
+    fn adjust_caret_x_on_caret_y_movement(&mut self) {
         let line_len = self
             .buffer
             .get_line_len(self.caret_pos.y.to_usize_clamp())
@@ -153,22 +153,31 @@ impl View {
         }
     }
 
+    fn change_caret_x(&mut self, new_x: u64) {
+        self.caret_pos.x = new_x;
+        self.adjust_scroll_to_caret_screen_pos();
+        self.previous_line_caret_max_x.take();
+    }
+
+    fn change_caret_y(&mut self, new_y: u64) {
+        self.caret_pos.y = new_y;
+        self.adjust_caret_x_on_caret_y_movement();
+        self.adjust_scroll_to_caret_screen_pos();
+    }
+
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
-                self.caret_pos.y = self.caret_pos.y.saturating_sub(1);
-                self.adjust_caret_x_on_caret_y_movement();
-                self.adjust_scroll_to_caret_screen_pos();
+                self.change_caret_y(self.caret_pos.y.saturating_sub(1));
                 true
             }
             EditorCommand::MoveCursorDown => {
-                self.caret_pos.y = self
-                    .caret_pos
-                    .y
-                    .saturating_add(1)
-                    .clamp(0, self.buffer.get_total_lines().to_u64());
-                self.adjust_caret_x_on_caret_y_movement();
-                self.adjust_scroll_to_caret_screen_pos();
+                self.change_caret_y(
+                    self.caret_pos
+                        .y
+                        .saturating_add(1)
+                        .clamp(0, self.buffer.get_total_lines().to_u64()),
+                );
                 true
             }
             EditorCommand::MoveCursorLeft => {
@@ -208,34 +217,28 @@ impl View {
                 true
             }
             EditorCommand::MoveCursorUpOnePage => {
-                self.caret_pos.y = self.caret_pos.y.saturating_sub(self.size.y);
-                self.adjust_caret_x_on_caret_y_movement();
-                self.adjust_scroll_to_caret_screen_pos();
+                self.change_caret_y(self.caret_pos.y.saturating_sub(self.size.y));
                 true
             }
             EditorCommand::MoveCursorDownOnePage => {
-                self.caret_pos.y = self
-                    .caret_pos
-                    .y
-                    .saturating_add(self.size.y)
-                    .clamp(0, self.buffer.get_total_lines().to_u64());
-                self.adjust_caret_x_on_caret_y_movement();
-                self.adjust_scroll_to_caret_screen_pos();
+                self.change_caret_y(
+                    self.caret_pos
+                        .y
+                        .saturating_add(self.size.y)
+                        .clamp(0, self.buffer.get_total_lines().to_u64()),
+                );
                 true
             }
             EditorCommand::MoveCursorToStartOfLine => {
-                self.caret_pos.x = 0;
-                self.adjust_scroll_to_caret_screen_pos();
-                self.previous_line_caret_max_x.take();
+                self.change_caret_x(0);
                 true
             }
             EditorCommand::MoveCursorToEndOfLine => {
-                self.caret_pos.x = self
-                    .buffer
-                    .get_line_len(self.caret_pos.y.to_usize_clamp())
-                    .to_u64();
-                self.adjust_scroll_to_caret_screen_pos();
-                self.previous_line_caret_max_x.take();
+                self.change_caret_x(
+                    self.buffer
+                        .get_line_len(self.caret_pos.y.to_usize_clamp())
+                        .to_u64(),
+                );
                 true
             }
             EditorCommand::InsertCharacter(ch) => {
