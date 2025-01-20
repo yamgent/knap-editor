@@ -262,6 +262,14 @@ impl View {
                         self.caret_pos.x.saturating_sub(1).to_usize_clamp(),
                     );
                     self.caret_pos.x = self.caret_pos.x.saturating_sub(1);
+                } else if self.caret_pos.y > 0 {
+                    self.caret_pos.y = self.caret_pos.y.saturating_sub(1);
+                    self.caret_pos.x = self
+                        .buffer
+                        .get_line_len(self.caret_pos.y.to_usize_clamp())
+                        .to_u64();
+                    self.buffer
+                        .join_line_with_below_line(self.caret_pos.y.to_usize_clamp());
                 }
 
                 self.adjust_scroll_to_caret_screen_pos();
@@ -279,6 +287,9 @@ impl View {
                         self.caret_pos.y.to_usize_clamp(),
                         self.caret_pos.x.to_usize_clamp(),
                     );
+                } else if self.caret_pos.y < self.buffer.get_total_lines().to_u64() {
+                    self.buffer
+                        .join_line_with_below_line(self.caret_pos.y.to_usize_clamp());
                 }
 
                 self.previous_line_caret_max_x.take();

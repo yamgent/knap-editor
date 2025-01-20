@@ -216,3 +216,12 @@ impl TextLine {
         }
     }
 }
+
+impl ToString for TextLine {
+    fn to_string(&self) -> String {
+        self.fragments
+            .iter()
+            .map(|fragment| fragment.grapheme.clone())
+            .collect()
+    }
+}

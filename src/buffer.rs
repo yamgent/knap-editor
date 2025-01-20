@@ -74,4 +74,25 @@ impl Buffer {
             line.remove_character(fragment_idx);
         }
     }
+
+    pub fn join_line_with_below_line(&mut self, line_idx: usize) {
+        let mut new_line_string = None;
+
+        if let Some(first_line) = self.content.get(line_idx) {
+            if let Some(second_line) = self.content.get(line_idx.saturating_add(1)) {
+                let mut final_string = first_line.to_string();
+                final_string.push_str(&second_line.to_string());
+                new_line_string = Some(final_string);
+            }
+        }
+
+        if let Some(new_line) = new_line_string {
+            *self
+                .content
+                .get_mut(line_idx)
+                .expect("line_idx to exist as new_line_string contains line_idx") =
+                TextLine::new(new_line);
+            self.content.remove(line_idx.saturating_add(1));
+        }
+    }
 }
