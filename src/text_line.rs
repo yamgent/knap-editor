@@ -217,11 +217,15 @@ impl TextLine {
     }
 }
 
-impl ToString for TextLine {
-    fn to_string(&self) -> String {
-        self.fragments
-            .iter()
-            .map(|fragment| fragment.grapheme.clone())
-            .collect()
+impl Display for TextLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.fragments
+                .iter()
+                .map(|fragment| fragment.grapheme.clone())
+                .collect::<String>()
+        )
     }
 }
