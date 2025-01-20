@@ -165,6 +165,12 @@ impl View {
         self.adjust_scroll_to_caret_screen_pos();
     }
 
+    fn change_caret_xy(&mut self, new_pos: Pos2u) {
+        self.caret_pos = new_pos;
+        self.adjust_scroll_to_caret_screen_pos();
+        self.previous_line_caret_max_x.take();
+    }
+
     pub fn execute_command(&mut self, command: EditorCommand) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
@@ -183,18 +189,19 @@ impl View {
             EditorCommand::MoveCursorLeft => {
                 if self.caret_pos.x == 0 {
                     if self.caret_pos.y > 0 {
-                        self.caret_pos.y = self.caret_pos.y.saturating_sub(1);
-                        self.caret_pos.x = self
-                            .buffer
-                            .get_line_len(self.caret_pos.y.to_usize_clamp())
-                            .to_u64();
+                        self.change_caret_xy(Pos2u {
+                            x: self
+                                .buffer
+                                .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize_clamp())
+                                .to_u64(),
+                            y: self.caret_pos.y.saturating_sub(1),
+                        });
+                    } else {
+                        self.previous_line_caret_max_x.take();
                     }
                 } else {
-                    self.caret_pos.x = self.caret_pos.x.saturating_sub(1);
+                    self.change_caret_x(self.caret_pos.x.saturating_sub(1));
                 }
-
-                self.adjust_scroll_to_caret_screen_pos();
-                self.previous_line_caret_max_x.take();
                 true
             }
             EditorCommand::MoveCursorRight => {
@@ -205,15 +212,16 @@ impl View {
 
                 if self.caret_pos.x == line_len {
                     if self.caret_pos.y < self.buffer.get_total_lines().to_u64() {
-                        self.caret_pos.y = self.caret_pos.y.saturating_add(1);
-                        self.caret_pos.x = 0;
+                        self.change_caret_xy(Pos2u {
+                            x: 0,
+                            y: self.caret_pos.y.saturating_add(1),
+                        });
+                    } else {
+                        self.previous_line_caret_max_x.take();
                     }
                 } else {
-                    self.caret_pos.x = self.caret_pos.x.saturating_add(1);
+                    self.change_caret_x(self.caret_pos.x.saturating_add(1));
                 }
-
-                self.adjust_scroll_to_caret_screen_pos();
-                self.previous_line_caret_max_x.take();
                 true
             }
             EditorCommand::MoveCursorUpOnePage => {
@@ -249,10 +257,8 @@ impl View {
                 ) {
                     Ok(result) => {
                         if result.line_len_increased {
-                            self.caret_pos.x = self.caret_pos.x.saturating_add(1);
-                            self.adjust_scroll_to_caret_screen_pos();
+                            self.change_caret_x(self.caret_pos.x.saturating_add(1));
                         }
-                        self.previous_line_caret_max_x.take();
                         true
                     }
                     Err(..) => false,
@@ -264,19 +270,25 @@ impl View {
                         self.caret_pos.y.to_usize_clamp(),
                         self.caret_pos.x.saturating_sub(1).to_usize_clamp(),
                     );
-                    self.caret_pos.x = self.caret_pos.x.saturating_sub(1);
-                } else if self.caret_pos.y > 0 {
-                    self.caret_pos.y = self.caret_pos.y.saturating_sub(1);
-                    self.caret_pos.x = self
-                        .buffer
-                        .get_line_len(self.caret_pos.y.to_usize_clamp())
-                        .to_u64();
-                    self.buffer
-                        .join_line_with_below_line(self.caret_pos.y.to_usize_clamp());
-                }
 
-                self.adjust_scroll_to_caret_screen_pos();
-                self.previous_line_caret_max_x.take();
+                    self.change_caret_x(self.caret_pos.x.saturating_sub(1));
+                } else if self.caret_pos.y > 0 {
+                    let previous_line_len = self
+                        .buffer
+                        .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize_clamp())
+                        .to_u64();
+
+                    self.buffer.join_line_with_below_line(
+                        self.caret_pos.y.saturating_sub(1).to_usize_clamp(),
+                    );
+
+                    self.change_caret_xy(Pos2u {
+                        x: previous_line_len,
+                        y: self.caret_pos.y.saturating_sub(1),
+                    });
+                } else {
+                    self.previous_line_caret_max_x.take();
+                }
                 true
             }
             EditorCommand::EraseCharacterAfterCursor => {
