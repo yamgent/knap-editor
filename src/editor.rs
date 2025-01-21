@@ -7,6 +7,7 @@ use crate::{
     buffer::Buffer,
     commands::EditorCommand,
     math::Pos2u,
+    status_bar,
     terminal::{self, TerminalPos},
     view::View,
 };
@@ -25,7 +26,7 @@ pub struct Editor {
     should_quit: bool,
 
     view: View,
-    status_bar_text: String,
+    message_bar_text: String,
 }
 
 impl Editor {
@@ -36,9 +37,9 @@ impl Editor {
             should_quit: false,
             view: View::new(Pos2u {
                 x: terminal_size.x,
-                y: terminal_size.y.saturating_sub(1),
+                y: terminal_size.y.saturating_sub(2),
             }),
-            status_bar_text: "Welcome to hecto".to_string(),
+            message_bar_text: "Welcome to hecto".to_string(),
         }
     }
 
@@ -60,12 +61,12 @@ impl Editor {
             let buffer = match Buffer::new_from_file(&filename) {
                 Ok(buffer) => buffer,
                 Err(err) => {
-                    self.status_bar_text = format!("Cannot load {filename}: {err}");
+                    self.message_bar_text = format!("Cannot load {filename}: {err}");
                     return;
                 }
             };
             self.view.replace_buffer(buffer);
-            self.status_bar_text = format!(r#""{filename}" opened"#);
+            self.message_bar_text = format!(r#""{filename}" opened"#);
         }
     }
 
@@ -155,18 +156,27 @@ impl Editor {
     }
 
     fn draw(&self) -> Result<()> {
+        let size = terminal::size()?;
+
         let mut state = terminal::start_draw()?;
 
         let new_cursor_pos = self.view.render()?;
 
-        if !self.status_bar_text.is_empty() {
-            let size = terminal::size()?;
+        status_bar::draw_status_bar(
+            Pos2u {
+                x: 0,
+                y: size.y.saturating_sub(2).into(),
+            },
+            self.view.get_status(),
+        )?;
+
+        if !self.message_bar_text.is_empty() {
             terminal::draw_text(
                 TerminalPos {
                     x: 0,
                     y: size.y.saturating_sub(1),
                 },
-                &self.status_bar_text,
+                &self.message_bar_text,
             )?;
         }
 

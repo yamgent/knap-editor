@@ -4,6 +4,7 @@ use crate::{
     buffer::Buffer,
     commands::EditorCommand,
     math::{Pos2u, ToU16Clamp, ToU64, ToUsizeClamp},
+    status_bar::ViewStatus,
     terminal::TerminalPos,
 };
 
@@ -39,6 +40,15 @@ impl View {
 
     pub fn replace_buffer(&mut self, buffer: Buffer) {
         self.buffer = buffer;
+    }
+
+    pub fn get_status(&self) -> ViewStatus {
+        ViewStatus {
+            filename: self.buffer.get_filename(),
+            total_lines: self.buffer.get_total_lines(),
+            is_dirty: self.buffer.get_is_dirty(),
+            caret_position: self.caret_pos,
+        }
     }
 
     fn get_screen_pos_from_caret_pos(&self, caret_pos: Pos2u) -> TerminalPos {

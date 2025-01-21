@@ -10,6 +10,7 @@ use crate::{
 pub struct Buffer {
     content: Vec<TextLine>,
     filename: Option<String>,
+    is_dirty: bool,
 }
 
 impl Buffer {
@@ -17,6 +18,7 @@ impl Buffer {
         Self {
             content: vec![],
             filename: None,
+            is_dirty: false,
         }
     }
 
@@ -26,10 +28,11 @@ impl Buffer {
         Ok(Self {
             content: content.lines().map(TextLine::new).collect(),
             filename: Some(filename.as_ref().to_string()),
+            is_dirty: false,
         })
     }
 
-    pub fn write_to_disk(&self) -> Result<()> {
+    pub fn write_to_disk(&mut self) -> Result<()> {
         if let Some(filename) = &self.filename {
             let mut file = File::create(filename)?;
             self.content
@@ -37,9 +40,18 @@ impl Buffer {
                 .map(|line| writeln!(file, "{line}"))
                 .find(Result::is_err)
                 .unwrap_or(Ok(()))?;
+            self.is_dirty = false;
         }
 
         Ok(())
+    }
+
+    pub fn get_filename(&self) -> Option<String> {
+        self.filename.clone()
+    }
+
+    pub fn get_is_dirty(&self) -> bool {
+        self.is_dirty
     }
 
     pub fn get_line_len(&self, line_idx: usize) -> usize {
@@ -76,12 +88,17 @@ impl Buffer {
     ) -> Result<InsertCharResult, InsertCharError> {
         if line_idx == self.content.len() {
             self.content.push(TextLine::new(character.to_string()));
+            self.is_dirty = true;
             Ok(InsertCharResult {
                 line_len_increased: true,
             })
         } else {
             match self.content.get_mut(line_idx) {
-                Some(line) => line.insert_character(fragment_idx, character),
+                Some(line) => {
+                    let insert_result = line.insert_character(fragment_idx, character);
+                    self.is_dirty = insert_result.is_ok();
+                    insert_result
+                }
                 None => Err(InsertCharError::InvalidPosition),
             }
         }
@@ -90,6 +107,7 @@ impl Buffer {
     pub fn remove_character(&mut self, line_idx: usize, fragment_idx: usize) {
         if let Some(line) = self.content.get_mut(line_idx) {
             line.remove_character(fragment_idx);
+            self.is_dirty = true;
         }
     }
 
@@ -111,6 +129,7 @@ impl Buffer {
                 .expect("line_idx to exist as new_line_string contains line_idx") =
                 TextLine::new(new_line);
             self.content.remove(line_idx.saturating_add(1));
+            self.is_dirty = true;
         }
     }
 
@@ -126,5 +145,7 @@ impl Buffer {
                 self.content.push(TextLine::new(""));
             }
         }
+
+        self.is_dirty = true;
     }
 }
