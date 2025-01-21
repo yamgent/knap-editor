@@ -312,6 +312,18 @@ impl View {
                 self.previous_line_caret_max_x.take();
                 true
             }
+
+            EditorCommand::InsertNewline => {
+                self.buffer.insert_newline_at(
+                    self.caret_pos.y.to_usize_clamp(),
+                    self.caret_pos.x.to_usize_clamp(),
+                );
+                self.change_caret_xy(Pos2u {
+                    x: 0,
+                    y: self.caret_pos.y.saturating_add(1),
+                });
+                true
+            }
             EditorCommand::QuitAll => false,
         }
     }

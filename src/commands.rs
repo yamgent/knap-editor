@@ -10,6 +10,7 @@ pub enum EditorCommand {
     MoveCursorToStartOfLine,
     MoveCursorToEndOfLine,
     InsertCharacter(char),
+    InsertNewline,
     EraseCharacterBeforeCursor,
     EraseCharacterAfterCursor,
 }

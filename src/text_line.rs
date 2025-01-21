@@ -215,6 +215,24 @@ impl TextLine {
             self.fragments = build_fragments_from_string(new_string);
         }
     }
+
+    pub fn split_off(&mut self, fragment_idx: usize) -> Self {
+        let left = self
+            .fragments
+            .iter()
+            .take(fragment_idx)
+            .map(|fragment| fragment.grapheme.clone())
+            .collect::<String>();
+        let right = self
+            .fragments
+            .iter()
+            .skip(fragment_idx)
+            .map(|fragment| fragment.grapheme.clone())
+            .collect::<String>();
+
+        self.fragments = build_fragments_from_string(left);
+        Self::new(right)
+    }
 }
 
 impl Display for TextLine {

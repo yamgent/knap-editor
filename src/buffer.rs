@@ -95,4 +95,18 @@ impl Buffer {
             self.content.remove(line_idx.saturating_add(1));
         }
     }
+
+    pub fn insert_newline_at(&mut self, line_idx: usize, fragment_idx: usize) {
+        assert!(line_idx <= self.content.len());
+
+        match self.content.get_mut(line_idx) {
+            Some(line) => {
+                let new_line = line.split_off(fragment_idx);
+                self.content.insert(line_idx.saturating_add(1), new_line);
+            }
+            None => {
+                self.content.push(TextLine::new(""));
+            }
+        }
+    }
 }

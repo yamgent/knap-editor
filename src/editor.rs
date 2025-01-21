@@ -127,6 +127,10 @@ impl Editor {
                     (&KeyModifiers::NONE, &KeyCode::Delete) => {
                         Some(EditorCommand::EraseCharacterAfterCursor)
                     }
+                    (&KeyModifiers::NONE, &KeyCode::Tab) => {
+                        Some(EditorCommand::InsertCharacter('\t'))
+                    }
+                    (&KeyModifiers::NONE, &KeyCode::Enter) => Some(EditorCommand::InsertNewline),
                     _ => None,
                 };
 
