@@ -13,4 +13,5 @@ pub enum EditorCommand {
     InsertNewline,
     EraseCharacterBeforeCursor,
     EraseCharacterAfterCursor,
+    WriteBufferToDisk,
 }

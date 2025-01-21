@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{fs::File, io::Write, ops::Range};
 
 use anyhow::Result;
 
@@ -9,11 +9,15 @@ use crate::{
 
 pub struct Buffer {
     content: Vec<TextLine>,
+    filename: Option<String>,
 }
 
 impl Buffer {
     pub fn new() -> Self {
-        Self { content: vec![] }
+        Self {
+            content: vec![],
+            filename: None,
+        }
     }
 
     pub fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
@@ -21,7 +25,21 @@ impl Buffer {
 
         Ok(Self {
             content: content.lines().map(TextLine::new).collect(),
+            filename: Some(filename.as_ref().to_string()),
         })
+    }
+
+    pub fn write_to_disk(&self) -> Result<()> {
+        if let Some(filename) = &self.filename {
+            let mut file = File::create(filename)?;
+            self.content
+                .iter()
+                .map(|line| writeln!(file, "{line}"))
+                .find(Result::is_err)
+                .unwrap_or(Ok(()))?;
+        }
+
+        Ok(())
     }
 
     pub fn get_line_len(&self, line_idx: usize) -> usize {

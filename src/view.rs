@@ -324,6 +324,11 @@ impl View {
                 });
                 true
             }
+            EditorCommand::WriteBufferToDisk => {
+                // will handle result in a future assignment
+                let _ = self.buffer.write_to_disk();
+                true
+            }
             EditorCommand::QuitAll => false,
         }
     }

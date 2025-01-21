@@ -131,6 +131,9 @@ impl Editor {
                         Some(EditorCommand::InsertCharacter('\t'))
                     }
                     (&KeyModifiers::NONE, &KeyCode::Enter) => Some(EditorCommand::InsertNewline),
+                    (&KeyModifiers::CONTROL, &KeyCode::Char('s')) => {
+                        Some(EditorCommand::WriteBufferToDisk)
+                    }
                     _ => None,
                 };
 
