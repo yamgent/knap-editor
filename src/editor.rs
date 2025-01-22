@@ -7,7 +7,7 @@ use crate::{
     buffer::Buffer,
     commands::EditorCommand,
     math::Pos2u,
-    status_bar,
+    status_bar::StatusBar,
     terminal::{self, TerminalPos},
     view::View,
 };
@@ -26,6 +26,7 @@ pub struct Editor {
     should_quit: bool,
 
     view: View,
+    status_bar: StatusBar,
     message_bar_text: String,
 }
 
@@ -39,6 +40,16 @@ impl Editor {
                 x: terminal_size.x,
                 y: terminal_size.y.saturating_sub(2),
             }),
+            status_bar: StatusBar::new(
+                Pos2u {
+                    x: 0,
+                    y: terminal_size.y.saturating_sub(2),
+                },
+                Pos2u {
+                    x: terminal_size.x,
+                    y: u64::from(terminal_size.y > 1),
+                },
+            ),
             message_bar_text: "Welcome to hecto".to_string(),
         }
     }
@@ -47,6 +58,7 @@ impl Editor {
         setup_panic_hook();
 
         terminal::init_terminal().expect("able to initialize terminal");
+        terminal::set_title("[No Name]").expect("able to set title");
 
         self.open_arg_file();
 
@@ -66,6 +78,7 @@ impl Editor {
                 }
             };
             self.view.replace_buffer(buffer);
+            terminal::set_title(&filename).expect("able to set title");
             self.message_bar_text = format!(r#""{filename}" opened"#);
         }
     }
@@ -149,6 +162,16 @@ impl Editor {
                     x: (*width).into(),
                     y: height.saturating_sub(1).into(),
                 });
+                self.status_bar.reshape(
+                    Pos2u {
+                        x: 0,
+                        y: height.saturating_sub(2).into(),
+                    },
+                    Pos2u {
+                        x: (*width).into(),
+                        y: u64::from(*height > 1),
+                    },
+                );
                 true
             }
             _ => false,
@@ -162,13 +185,7 @@ impl Editor {
 
         let new_cursor_pos = self.view.render()?;
 
-        status_bar::draw_status_bar(
-            Pos2u {
-                x: 0,
-                y: size.y.saturating_sub(2).into(),
-            },
-            self.view.get_status(),
-        )?;
+        self.status_bar.render(self.view.get_status())?;
 
         if !self.message_bar_text.is_empty() {
             terminal::draw_text(
