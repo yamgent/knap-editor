@@ -6,9 +6,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use crate::{
     buffer::Buffer,
     commands::EditorCommand,
-    math::Pos2u,
+    math::{Bounds2u, Pos2u},
+    message_bar::MessageBar,
     status_bar::StatusBar,
-    terminal::{self, TerminalPos},
+    terminal,
     view::View,
 };
 
@@ -27,12 +28,24 @@ pub struct Editor {
 
     view: View,
     status_bar: StatusBar,
-    message_bar_text: String,
+    message_bar: MessageBar,
 }
 
 impl Editor {
     pub fn new() -> Self {
         let terminal_size = terminal::size_u64().expect("able to get terminal size");
+
+        let mut message_bar = MessageBar::new(Bounds2u {
+            pos: Pos2u {
+                x: 0,
+                y: terminal_size.y.saturating_sub(1),
+            },
+            size: Pos2u {
+                x: terminal_size.x,
+                y: 1,
+            },
+        });
+        message_bar.set_message("HELP: Ctrl-S = save | Ctrl-Q = quit");
 
         Self {
             should_quit: false,
@@ -50,7 +63,7 @@ impl Editor {
                     y: u64::from(terminal_size.y > 1),
                 },
             ),
-            message_bar_text: "Welcome to hecto".to_string(),
+            message_bar,
         }
     }
 
@@ -73,13 +86,13 @@ impl Editor {
             let buffer = match Buffer::new_from_file(&filename) {
                 Ok(buffer) => buffer,
                 Err(err) => {
-                    self.message_bar_text = format!("Cannot load {filename}: {err}");
+                    self.message_bar
+                        .set_message(format!("Cannot load {filename}: {err}"));
                     return;
                 }
             };
             self.view.replace_buffer(buffer);
             terminal::set_title(&filename).expect("able to set title");
-            self.message_bar_text = format!(r#""{filename}" opened"#);
         }
     }
 
@@ -179,23 +192,11 @@ impl Editor {
     }
 
     fn draw(&self) -> Result<()> {
-        let size = terminal::size()?;
-
         let mut state = terminal::start_draw()?;
 
         let new_cursor_pos = self.view.render()?;
-
         self.status_bar.render(self.view.get_status())?;
-
-        if !self.message_bar_text.is_empty() {
-            terminal::draw_text(
-                TerminalPos {
-                    x: 0,
-                    y: size.y.saturating_sub(1),
-                },
-                &self.message_bar_text,
-            )?;
-        }
+        self.message_bar.render()?;
 
         state.cursor_pos = new_cursor_pos;
 

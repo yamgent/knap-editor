@@ -57,14 +57,6 @@ pub fn end_draw(restore_state: &TerminalRestoreState) -> Result<()> {
     Ok(())
 }
 
-pub fn size() -> Result<TerminalSize> {
-    let size = terminal::size()?;
-    Ok(TerminalSize {
-        x: size.0,
-        y: size.1,
-    })
-}
-
 pub fn size_u64() -> Result<Pos2u> {
     let size = terminal::size()?;
     Ok(Pos2u {

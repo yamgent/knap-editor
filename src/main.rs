@@ -11,6 +11,7 @@ mod buffer;
 mod commands;
 mod editor;
 mod math;
+mod message_bar;
 mod status_bar;
 mod terminal;
 mod text_line;

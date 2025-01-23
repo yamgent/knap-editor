@@ -4,8 +4,19 @@ pub struct Pos2u {
     pub y: u64,
 }
 
+// TODO: rename this to Vec2u instead?
 impl Pos2u {
     pub const ZERO: Self = Self { x: 0, y: 0 };
+
+    pub fn saturating_area(&self) -> u64 {
+        self.x.saturating_mul(self.y)
+    }
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub struct Bounds2u {
+    pub pos: Pos2u,
+    pub size: Pos2u,
 }
 
 pub trait ToUsizeClamp
