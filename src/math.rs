@@ -1,11 +1,10 @@
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
-pub struct Pos2u {
+pub struct Vec2u {
     pub x: u64,
     pub y: u64,
 }
 
-// TODO: rename this to Vec2u instead?
-impl Pos2u {
+impl Vec2u {
     pub const ZERO: Self = Self { x: 0, y: 0 };
 
     pub fn saturating_area(&self) -> u64 {
@@ -15,8 +14,8 @@ impl Pos2u {
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct Bounds2u {
-    pub pos: Pos2u,
-    pub size: Pos2u,
+    pub pos: Vec2u,
+    pub size: Vec2u,
 }
 
 pub trait ToUsizeClamp

@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::{
     buffer::Buffer,
     commands::EditorCommand,
-    math::{Bounds2u, Pos2u, ToU16Clamp, ToU64, ToUsizeClamp},
+    math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     status_bar::ViewStatus,
     terminal::TerminalPos,
 };
@@ -13,8 +13,8 @@ pub struct View {
 
     buffer: Buffer,
 
-    caret_pos: Pos2u,
-    scroll_offset: Pos2u,
+    caret_pos: Vec2u,
+    scroll_offset: Vec2u,
 
     /// When the caret moves between the lines on the y-axis
     /// without changing the x position, editors tend to remember
@@ -33,8 +33,8 @@ impl View {
         Self {
             buffer: Buffer::new(),
             bounds,
-            caret_pos: Pos2u::ZERO,
-            scroll_offset: Pos2u::ZERO,
+            caret_pos: Vec2u::ZERO,
+            scroll_offset: Vec2u::ZERO,
             previous_line_caret_max_x: None,
         }
     }
@@ -52,7 +52,7 @@ impl View {
         }
     }
 
-    fn get_grid_pos_from_caret_pos(&self, caret_pos: Pos2u) -> TerminalPos {
+    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> TerminalPos {
         TerminalPos {
             x: self
                 .buffer
@@ -185,7 +185,7 @@ impl View {
         self.adjust_scroll_to_caret_grid_pos();
     }
 
-    fn change_caret_xy(&mut self, new_pos: Pos2u) {
+    fn change_caret_xy(&mut self, new_pos: Vec2u) {
         self.caret_pos = new_pos;
         self.adjust_scroll_to_caret_grid_pos();
         self.previous_line_caret_max_x.take();
@@ -211,7 +211,7 @@ impl View {
             EditorCommand::MoveCursorLeft => {
                 if self.caret_pos.x == 0 {
                     if self.caret_pos.y > 0 {
-                        self.change_caret_xy(Pos2u {
+                        self.change_caret_xy(Vec2u {
                             x: self
                                 .buffer
                                 .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize_clamp())
@@ -234,7 +234,7 @@ impl View {
 
                 if self.caret_pos.x == line_len {
                     if self.caret_pos.y < self.buffer.get_total_lines().to_u64() {
-                        self.change_caret_xy(Pos2u {
+                        self.change_caret_xy(Vec2u {
                             x: 0,
                             y: self.caret_pos.y.saturating_add(1),
                         });
@@ -304,7 +304,7 @@ impl View {
                         self.caret_pos.y.saturating_sub(1).to_usize_clamp(),
                     );
 
-                    self.change_caret_xy(Pos2u {
+                    self.change_caret_xy(Vec2u {
                         x: previous_line_len,
                         y: self.caret_pos.y.saturating_sub(1),
                     });
@@ -338,7 +338,7 @@ impl View {
                     self.caret_pos.y.to_usize_clamp(),
                     self.caret_pos.x.to_usize_clamp(),
                 );
-                self.change_caret_xy(Pos2u {
+                self.change_caret_xy(Vec2u {
                     x: 0,
                     y: self.caret_pos.y.saturating_add(1),
                 });

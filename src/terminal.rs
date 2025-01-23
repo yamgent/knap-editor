@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use anyhow::Result;
 use crossterm::{cursor, queue, style, terminal};
 
-use crate::math::Pos2u;
+use crate::math::Vec2u;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalSize {
@@ -57,9 +57,9 @@ pub fn end_draw(restore_state: &TerminalRestoreState) -> Result<()> {
     Ok(())
 }
 
-pub fn size_u64() -> Result<Pos2u> {
+pub fn size_u64() -> Result<Vec2u> {
     let size = terminal::size()?;
-    Ok(Pos2u {
+    Ok(Vec2u {
         x: size.0.into(),
         y: size.1.into(),
     })

@@ -6,7 +6,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use crate::{
     buffer::Buffer,
     commands::EditorCommand,
-    math::{Bounds2u, Pos2u},
+    math::{Bounds2u, Vec2u},
     message_bar::MessageBar,
     status_bar::StatusBar,
     terminal,
@@ -36,30 +36,30 @@ impl Editor {
         let terminal_size = terminal::size_u64().expect("able to get terminal size");
 
         let view = View::new(Bounds2u {
-            pos: Pos2u { x: 0, y: 0 },
-            size: Pos2u {
+            pos: Vec2u { x: 0, y: 0 },
+            size: Vec2u {
                 x: terminal_size.x,
                 y: terminal_size.y.saturating_sub(2),
             },
         });
 
         let status_bar = StatusBar::new(Bounds2u {
-            pos: Pos2u {
+            pos: Vec2u {
                 x: 0,
                 y: terminal_size.y.saturating_sub(2),
             },
-            size: Pos2u {
+            size: Vec2u {
                 x: terminal_size.x,
                 y: u64::from(terminal_size.y > 1),
             },
         });
 
         let mut message_bar = MessageBar::new(Bounds2u {
-            pos: Pos2u {
+            pos: Vec2u {
                 x: 0,
                 y: terminal_size.y.saturating_sub(1),
             },
-            size: Pos2u {
+            size: Vec2u {
                 x: terminal_size.x,
                 y: 1,
             },
@@ -179,28 +179,28 @@ impl Editor {
             }
             Event::Resize(width, height) => {
                 self.view.set_bounds(Bounds2u {
-                    pos: Pos2u { x: 0, y: 0 },
-                    size: Pos2u {
+                    pos: Vec2u { x: 0, y: 0 },
+                    size: Vec2u {
                         x: (*width).into(),
                         y: height.saturating_sub(2).into(),
                     },
                 });
                 self.status_bar.set_bounds(Bounds2u {
-                    pos: Pos2u {
+                    pos: Vec2u {
                         x: 0,
                         y: height.saturating_sub(2).into(),
                     },
-                    size: Pos2u {
+                    size: Vec2u {
                         x: (*width).into(),
                         y: u64::from(*height > 1),
                     },
                 });
                 self.message_bar.set_bounds(Bounds2u {
-                    pos: Pos2u {
+                    pos: Vec2u {
                         x: 0,
                         y: height.saturating_sub(1).into(),
                     },
-                    size: Pos2u {
+                    size: Vec2u {
                         x: (*width).into(),
                         y: 1,
                     },

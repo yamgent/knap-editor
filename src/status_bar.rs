@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::{
-    math::{Bounds2u, Pos2u, ToU16Clamp, ToUsizeClamp},
+    math::{Bounds2u, ToU16Clamp, ToUsizeClamp, Vec2u},
     terminal::{self, TerminalPos},
 };
 
@@ -9,7 +9,7 @@ pub struct ViewStatus {
     pub filename: Option<String>,
     pub total_lines: usize,
     pub is_dirty: bool,
-    pub caret_position: Pos2u,
+    pub caret_position: Vec2u,
 }
 
 pub struct StatusBar {
