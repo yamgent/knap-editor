@@ -185,6 +185,16 @@ impl Editor {
                         y: u64::from(*height > 1),
                     },
                 );
+                self.message_bar.set_bounds(Bounds2u {
+                    pos: Pos2u {
+                        x: 0,
+                        y: height.saturating_sub(1).into(),
+                    },
+                    size: Pos2u {
+                        x: (*width).into(),
+                        y: 1,
+                    },
+                });
                 true
             }
             _ => false,

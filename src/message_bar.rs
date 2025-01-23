@@ -18,6 +18,10 @@ impl MessageBar {
         }
     }
 
+    pub fn set_bounds(&mut self, bounds: Bounds2u) {
+        self.bounds = bounds;
+    }
+
     pub fn set_message<T: AsRef<str>>(&mut self, message: T) {
         self.message = Some(message.as_ref().to_string());
     }
