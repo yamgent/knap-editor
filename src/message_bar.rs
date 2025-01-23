@@ -6,15 +6,15 @@ use crate::{
 };
 
 pub struct MessageBar {
-    message: Option<String>,
     bounds: Bounds2u,
+    message: Option<String>,
 }
 
 impl MessageBar {
     pub fn new(bounds: Bounds2u) -> Self {
         Self {
-            message: None,
             bounds,
+            message: None,
         }
     }
 

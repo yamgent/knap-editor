@@ -35,6 +35,25 @@ impl Editor {
     pub fn new() -> Self {
         let terminal_size = terminal::size_u64().expect("able to get terminal size");
 
+        let view = View::new(Bounds2u {
+            pos: Pos2u { x: 0, y: 0 },
+            size: Pos2u {
+                x: terminal_size.x,
+                y: terminal_size.y.saturating_sub(2),
+            },
+        });
+
+        let status_bar = StatusBar::new(Bounds2u {
+            pos: Pos2u {
+                x: 0,
+                y: terminal_size.y.saturating_sub(2),
+            },
+            size: Pos2u {
+                x: terminal_size.x,
+                y: u64::from(terminal_size.y > 1),
+            },
+        });
+
         let mut message_bar = MessageBar::new(Bounds2u {
             pos: Pos2u {
                 x: 0,
@@ -49,20 +68,8 @@ impl Editor {
 
         Self {
             should_quit: false,
-            view: View::new(Pos2u {
-                x: terminal_size.x,
-                y: terminal_size.y.saturating_sub(2),
-            }),
-            status_bar: StatusBar::new(
-                Pos2u {
-                    x: 0,
-                    y: terminal_size.y.saturating_sub(2),
-                },
-                Pos2u {
-                    x: terminal_size.x,
-                    y: u64::from(terminal_size.y > 1),
-                },
-            ),
+            view,
+            status_bar,
             message_bar,
         }
     }
@@ -171,20 +178,23 @@ impl Editor {
                 }
             }
             Event::Resize(width, height) => {
-                self.view.resize(Pos2u {
-                    x: (*width).into(),
-                    y: height.saturating_sub(1).into(),
+                self.view.set_bounds(Bounds2u {
+                    pos: Pos2u { x: 0, y: 0 },
+                    size: Pos2u {
+                        x: (*width).into(),
+                        y: height.saturating_sub(2).into(),
+                    },
                 });
-                self.status_bar.reshape(
-                    Pos2u {
+                self.status_bar.set_bounds(Bounds2u {
+                    pos: Pos2u {
                         x: 0,
                         y: height.saturating_sub(2).into(),
                     },
-                    Pos2u {
+                    size: Pos2u {
                         x: (*width).into(),
                         y: u64::from(*height > 1),
                     },
-                );
+                });
                 self.message_bar.set_bounds(Bounds2u {
                     pos: Pos2u {
                         x: 0,

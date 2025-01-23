@@ -3,15 +3,16 @@ use anyhow::Result;
 use crate::{
     buffer::Buffer,
     commands::EditorCommand,
-    math::{Pos2u, ToU16Clamp, ToU64, ToUsizeClamp},
+    math::{Bounds2u, Pos2u, ToU16Clamp, ToU64, ToUsizeClamp},
     status_bar::ViewStatus,
     terminal::TerminalPos,
 };
 
 pub struct View {
+    bounds: Bounds2u,
+
     buffer: Buffer,
 
-    size: Pos2u,
     caret_pos: Pos2u,
     scroll_offset: Pos2u,
 
@@ -28,10 +29,10 @@ pub struct View {
 }
 
 impl View {
-    pub fn new(size: Pos2u) -> Self {
+    pub fn new(bounds: Bounds2u) -> Self {
         Self {
             buffer: Buffer::new(),
-            size,
+            bounds,
             caret_pos: Pos2u::ZERO,
             scroll_offset: Pos2u::ZERO,
             previous_line_caret_max_x: None,
@@ -51,7 +52,7 @@ impl View {
         }
     }
 
-    fn get_screen_pos_from_caret_pos(&self, caret_pos: Pos2u) -> TerminalPos {
+    fn get_grid_pos_from_caret_pos(&self, caret_pos: Pos2u) -> TerminalPos {
         TerminalPos {
             x: self
                 .buffer
@@ -61,75 +62,84 @@ impl View {
         }
     }
 
-    pub fn resize(&mut self, size: Pos2u) {
-        self.size = size;
-        self.adjust_scroll_to_caret_screen_pos();
+    pub fn set_bounds(&mut self, bounds: Bounds2u) {
+        self.bounds = bounds;
+        self.adjust_scroll_to_caret_grid_pos();
     }
 
     pub fn render(&self) -> Result<TerminalPos> {
-        (0..self.size.y)
+        (0..self.bounds.size.y)
             .map(|y| {
                 self.buffer.render_line(
                     (self.scroll_offset.y.saturating_add(y)).to_usize_clamp(),
                     TerminalPos {
-                        x: 0,
-                        y: y.to_u16_clamp(),
+                        x: self.bounds.pos.x.to_u16_clamp(),
+                        y: self
+                            .bounds
+                            .pos
+                            .y
+                            .to_u16_clamp()
+                            .saturating_add(y.to_u16_clamp()),
                     },
-                    self.scroll_offset.x..(self.scroll_offset.x.saturating_add(self.size.x)),
+                    self.scroll_offset.x..(self.scroll_offset.x.saturating_add(self.bounds.size.x)),
                 )
             })
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
 
-        let screen_cursor_pos = self.get_screen_pos_from_caret_pos(self.caret_pos);
+        let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
         Ok(TerminalPos {
-            x: screen_cursor_pos
-                .x
-                .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
-            y: screen_cursor_pos
-                .y
-                .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
+            x: self.bounds.pos.x.to_u16_clamp().saturating_add(
+                grid_cursor_pos
+                    .x
+                    .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
+            ),
+            y: self.bounds.pos.y.to_u16_clamp().saturating_add(
+                grid_cursor_pos
+                    .y
+                    .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
+            ),
         })
     }
 
-    fn adjust_scroll_to_caret_screen_pos(&mut self) {
-        let screen_cursor_pos = self.get_screen_pos_from_caret_pos(self.caret_pos);
+    fn adjust_scroll_to_caret_grid_pos(&mut self) {
+        let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        if screen_cursor_pos.x < self.scroll_offset.x.to_u16_clamp() {
-            self.scroll_offset.x = u64::from(screen_cursor_pos.x);
+        if grid_cursor_pos.x < self.scroll_offset.x.to_u16_clamp() {
+            self.scroll_offset.x = u64::from(grid_cursor_pos.x);
         }
 
-        if screen_cursor_pos.y < self.scroll_offset.y.to_u16_clamp() {
-            self.scroll_offset.y = u64::from(screen_cursor_pos.y);
+        if grid_cursor_pos.y < self.scroll_offset.y.to_u16_clamp() {
+            self.scroll_offset.y = u64::from(grid_cursor_pos.y);
         }
 
-        if screen_cursor_pos.x
+        if grid_cursor_pos.x
             >= self
                 .scroll_offset
                 .x
-                .saturating_add(self.size.x)
+                .saturating_add(self.bounds.size.x)
                 .to_u16_clamp()
         {
             self.scroll_offset.x = u64::from(
-                screen_cursor_pos
+                grid_cursor_pos
                     .x
-                    .saturating_sub(self.size.x.to_u16_clamp())
+                    .saturating_sub(self.bounds.size.x.to_u16_clamp())
                     .saturating_add(1),
             );
         }
 
-        if screen_cursor_pos.y
+        if grid_cursor_pos.y
             >= self
                 .scroll_offset
                 .y
-                .saturating_add(self.size.y)
+                .saturating_add(self.bounds.size.y)
                 .to_u16_clamp()
         {
             self.scroll_offset.y = u64::from(
-                screen_cursor_pos
+                grid_cursor_pos
                     .y
-                    .saturating_sub(self.size.y.to_u16_clamp())
+                    .saturating_sub(self.bounds.size.y.to_u16_clamp())
                     .saturating_add(1),
             );
         }
@@ -165,19 +175,19 @@ impl View {
 
     fn change_caret_x(&mut self, new_x: u64) {
         self.caret_pos.x = new_x;
-        self.adjust_scroll_to_caret_screen_pos();
+        self.adjust_scroll_to_caret_grid_pos();
         self.previous_line_caret_max_x.take();
     }
 
     fn change_caret_y(&mut self, new_y: u64) {
         self.caret_pos.y = new_y;
         self.adjust_caret_x_on_caret_y_movement();
-        self.adjust_scroll_to_caret_screen_pos();
+        self.adjust_scroll_to_caret_grid_pos();
     }
 
     fn change_caret_xy(&mut self, new_pos: Pos2u) {
         self.caret_pos = new_pos;
-        self.adjust_scroll_to_caret_screen_pos();
+        self.adjust_scroll_to_caret_grid_pos();
         self.previous_line_caret_max_x.take();
     }
 
@@ -237,14 +247,14 @@ impl View {
                 true
             }
             EditorCommand::MoveCursorUpOnePage => {
-                self.change_caret_y(self.caret_pos.y.saturating_sub(self.size.y));
+                self.change_caret_y(self.caret_pos.y.saturating_sub(self.bounds.size.y));
                 true
             }
             EditorCommand::MoveCursorDownOnePage => {
                 self.change_caret_y(
                     self.caret_pos
                         .y
-                        .saturating_add(self.size.y)
+                        .saturating_add(self.bounds.size.y)
                         .clamp(0, self.buffer.get_total_lines().to_u64()),
                 );
                 true
