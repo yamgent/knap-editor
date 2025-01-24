@@ -366,7 +366,7 @@ impl View {
                 }
                 true
             }
-            EditorCommand::QuitAll | EditorCommand::Cancel => false,
+            EditorCommand::QuitAll | EditorCommand::Dismiss => false,
         }
     }
 }

@@ -216,7 +216,7 @@ impl Editor {
                     (&KeyModifiers::CONTROL, &KeyCode::Char('s')) => {
                         Some(EditorCommand::WriteBufferToDisk)
                     }
-                    (&KeyModifiers::NONE, &KeyCode::Esc) => Some(EditorCommand::Cancel),
+                    (&KeyModifiers::NONE, &KeyCode::Esc) => Some(EditorCommand::Dismiss),
                     _ => None,
                 };
 

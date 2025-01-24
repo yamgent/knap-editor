@@ -274,7 +274,7 @@ impl CommandBar {
                     submitted_data: None,
                 }
             }
-            EditorCommand::Cancel => {
+            EditorCommand::Dismiss => {
                 if matches!(self.prompt, CommandBarPrompt::SaveAs) {
                     message_bar.set_message("Save aborted");
                 }
