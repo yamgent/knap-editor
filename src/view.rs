@@ -4,6 +4,7 @@ use crate::{
     buffer::Buffer,
     commands::EditorCommand,
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
+    message_bar::MessageBar,
     status_bar::ViewStatus,
     terminal::TerminalPos,
 };
@@ -193,7 +194,11 @@ impl View {
 
     // splitting the function up doesn't change the readability much
     #[allow(clippy::too_many_lines)]
-    pub fn execute_command(&mut self, command: EditorCommand) -> bool {
+    pub fn execute_command(
+        &mut self,
+        command: EditorCommand,
+        message_bar: &mut MessageBar,
+    ) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
                 self.change_caret_y(self.caret_pos.y.saturating_sub(1));
@@ -345,8 +350,10 @@ impl View {
                 true
             }
             EditorCommand::WriteBufferToDisk => {
-                // will handle result in a future assignment
-                let _ = self.buffer.write_to_disk();
+                match self.buffer.write_to_disk() {
+                    Ok(()) => message_bar.set_message("File saved successfully"),
+                    Err(err) => message_bar.set_message(format!("Error writing file: {err:?}")),
+                }
                 true
             }
             EditorCommand::QuitAll => false,

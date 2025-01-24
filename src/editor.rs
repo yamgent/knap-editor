@@ -26,6 +26,10 @@ fn setup_panic_hook() {
 pub struct Editor {
     should_quit: bool,
 
+    // this is used to block the user if he tries to
+    // quit the editor without saving a modified file
+    block_quit_remaining_tries: usize,
+
     view: View,
     status_bar: StatusBar,
     message_bar: MessageBar,
@@ -68,6 +72,7 @@ impl Editor {
 
         Self {
             should_quit: false,
+            block_quit_remaining_tries: 0,
             view,
             status_bar,
             message_bar,
@@ -115,10 +120,27 @@ impl Editor {
     fn execute_command(&mut self, command: EditorCommand) -> bool {
         match command {
             EditorCommand::QuitAll => {
-                self.should_quit = true;
+                if self.block_quit_remaining_tries == 0 {
+                    self.should_quit = true;
+                } else {
+                    self.message_bar.set_message(format!(
+                        "WARNING! File has unsaved changes. Press Ctrl-Q {} more times to quit.",
+                        self.block_quit_remaining_tries
+                    ));
+                    self.block_quit_remaining_tries =
+                        self.block_quit_remaining_tries.saturating_sub(1);
+                }
                 true
             }
-            _ => self.view.execute_command(command),
+            _ => {
+                let result = self.view.execute_command(command, &mut self.message_bar);
+                self.block_quit_remaining_tries = if self.view.get_status().is_dirty {
+                    3
+                } else {
+                    0
+                };
+                result
+            }
         }
     }
 
