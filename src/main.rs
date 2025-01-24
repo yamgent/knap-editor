@@ -8,6 +8,7 @@
 )]
 
 mod buffer;
+mod command_bar;
 mod commands;
 mod editor;
 mod math;

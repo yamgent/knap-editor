@@ -32,6 +32,14 @@ impl Buffer {
         })
     }
 
+    pub fn is_untitled_file(&self) -> bool {
+        self.filename.is_none()
+    }
+
+    pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
+        self.filename = Some(filename.as_ref().to_string());
+    }
+
     pub fn write_to_disk(&mut self) -> Result<()> {
         if let Some(filename) = &self.filename {
             let mut file = File::create(filename)?;

@@ -5,6 +5,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 
 use crate::{
     buffer::Buffer,
+    command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
     math::{Bounds2u, Vec2u},
     message_bar::MessageBar,
@@ -33,6 +34,7 @@ pub struct Editor {
     view: View,
     status_bar: StatusBar,
     message_bar: MessageBar,
+    command_bar: CommandBar,
 }
 
 impl Editor {
@@ -70,12 +72,24 @@ impl Editor {
         });
         message_bar.set_message("HELP: Ctrl-S = save | Ctrl-Q = quit");
 
+        let command_bar = CommandBar::new(Bounds2u {
+            pos: Vec2u {
+                x: 0,
+                y: terminal_size.y.saturating_sub(1),
+            },
+            size: Vec2u {
+                x: terminal_size.x,
+                y: 1,
+            },
+        });
+
         Self {
             should_quit: false,
             block_quit_remaining_tries: 0,
             view,
             status_bar,
             message_bar,
+            command_bar,
         }
     }
 
@@ -129,8 +143,24 @@ impl Editor {
                 self.block_quit_remaining_tries = self.block_quit_remaining_tries.saturating_sub(1);
             }
             true
+        } else if self.command_bar.has_active_prompt() {
+            let result = self
+                .command_bar
+                .execute_command(command, &mut self.message_bar);
+
+            if let Some((prompt, value)) = result.submitted_data {
+                self.command_bar.clear_prompt();
+                if matches!(prompt, CommandBarPrompt::SaveAs) {
+                    self.view.change_filename(value);
+                    self.execute_command(EditorCommand::WriteBufferToDisk);
+                }
+            }
+
+            result.is_command_handled
         } else {
-            let result = self.view.execute_command(command, &mut self.message_bar);
+            let result =
+                self.view
+                    .execute_command(command, &mut self.message_bar, &mut self.command_bar);
             self.block_quit_remaining_tries = if self.view.get_status().is_dirty {
                 3
             } else {
@@ -186,6 +216,7 @@ impl Editor {
                     (&KeyModifiers::CONTROL, &KeyCode::Char('s')) => {
                         Some(EditorCommand::WriteBufferToDisk)
                     }
+                    (&KeyModifiers::NONE, &KeyCode::Esc) => Some(EditorCommand::Cancel),
                     _ => None,
                 };
 
@@ -223,6 +254,16 @@ impl Editor {
                         y: 1,
                     },
                 });
+                self.command_bar.set_bounds(Bounds2u {
+                    pos: Vec2u {
+                        x: 0,
+                        y: height.saturating_sub(1).into(),
+                    },
+                    size: Vec2u {
+                        x: (*width).into(),
+                        y: 1,
+                    },
+                });
                 true
             }
             _ => false,
@@ -232,9 +273,14 @@ impl Editor {
     fn draw(&self) -> Result<()> {
         let mut state = terminal::start_draw()?;
 
-        let new_cursor_pos = self.view.render()?;
+        let mut new_cursor_pos = self.view.render()?;
         self.status_bar.render(self.view.get_status())?;
-        self.message_bar.render()?;
+
+        if self.command_bar.has_active_prompt() {
+            new_cursor_pos = self.command_bar.render()?;
+        } else {
+            self.message_bar.render()?;
+        }
 
         state.cursor_pos = new_cursor_pos;
 

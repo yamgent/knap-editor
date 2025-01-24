@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::{
     buffer::Buffer,
+    command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
@@ -42,6 +43,10 @@ impl View {
 
     pub fn replace_buffer(&mut self, buffer: Buffer) {
         self.buffer = buffer;
+    }
+
+    pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
+        self.buffer.change_filename(filename);
     }
 
     pub fn get_status(&self) -> ViewStatus {
@@ -198,6 +203,7 @@ impl View {
         &mut self,
         command: EditorCommand,
         message_bar: &mut MessageBar,
+        command_bar: &mut CommandBar,
     ) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
@@ -350,13 +356,17 @@ impl View {
                 true
             }
             EditorCommand::WriteBufferToDisk => {
-                match self.buffer.write_to_disk() {
-                    Ok(()) => message_bar.set_message("File saved successfully"),
-                    Err(err) => message_bar.set_message(format!("Error writing file: {err:?}")),
+                if self.buffer.is_untitled_file() {
+                    command_bar.set_prompt(CommandBarPrompt::SaveAs);
+                } else {
+                    match self.buffer.write_to_disk() {
+                        Ok(()) => message_bar.set_message("File saved successfully"),
+                        Err(err) => message_bar.set_message(format!("Error writing file: {err:?}")),
+                    }
                 }
                 true
             }
-            EditorCommand::QuitAll => false,
+            EditorCommand::QuitAll | EditorCommand::Cancel => false,
         }
     }
 }
