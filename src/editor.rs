@@ -151,7 +151,8 @@ impl Editor {
             if let Some((prompt, value)) = result.submitted_data {
                 self.command_bar.clear_prompt();
                 if matches!(prompt, CommandBarPrompt::SaveAs) {
-                    self.view.change_filename(value);
+                    self.view.change_filename(&value);
+                    terminal::set_title(value).expect("able to set title");
                     self.execute_command(EditorCommand::WriteBufferToDisk);
                 }
             }
