@@ -118,29 +118,25 @@ impl Editor {
     }
 
     fn execute_command(&mut self, command: EditorCommand) -> bool {
-        match command {
-            EditorCommand::QuitAll => {
-                if self.block_quit_remaining_tries == 0 {
-                    self.should_quit = true;
-                } else {
-                    self.message_bar.set_message(format!(
-                        "WARNING! File has unsaved changes. Press Ctrl-Q {} more times to quit.",
-                        self.block_quit_remaining_tries
-                    ));
-                    self.block_quit_remaining_tries =
-                        self.block_quit_remaining_tries.saturating_sub(1);
-                }
-                true
+        if matches!(command, EditorCommand::QuitAll) {
+            if self.block_quit_remaining_tries == 0 {
+                self.should_quit = true;
+            } else {
+                self.message_bar.set_message(format!(
+                    "WARNING! File has unsaved changes. Press Ctrl-Q {} more times to quit.",
+                    self.block_quit_remaining_tries
+                ));
+                self.block_quit_remaining_tries = self.block_quit_remaining_tries.saturating_sub(1);
             }
-            _ => {
-                let result = self.view.execute_command(command, &mut self.message_bar);
-                self.block_quit_remaining_tries = if self.view.get_status().is_dirty {
-                    3
-                } else {
-                    0
-                };
-                result
-            }
+            true
+        } else {
+            let result = self.view.execute_command(command, &mut self.message_bar);
+            self.block_quit_remaining_tries = if self.view.get_status().is_dirty {
+                3
+            } else {
+                0
+            };
+            result
         }
     }
 
