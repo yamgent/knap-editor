@@ -1,11 +1,21 @@
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
-pub struct Pos2u {
+pub struct Vec2u {
     pub x: u64,
     pub y: u64,
 }
 
-impl Pos2u {
+impl Vec2u {
     pub const ZERO: Self = Self { x: 0, y: 0 };
+
+    pub fn saturating_area(&self) -> u64 {
+        self.x.saturating_mul(self.y)
+    }
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub struct Bounds2u {
+    pub pos: Vec2u,
+    pub size: Vec2u,
 }
 
 pub trait ToUsizeClamp

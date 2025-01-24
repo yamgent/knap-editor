@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use anyhow::Result;
 use crossterm::{cursor, queue, style, terminal};
 
-use crate::math::Pos2u;
+use crate::math::Vec2u;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalSize {
@@ -25,12 +25,14 @@ pub fn init_terminal() -> Result<()> {
     terminal::enable_raw_mode()?;
 
     queue!(io::stdout(), terminal::EnterAlternateScreen)?;
+    queue!(io::stdout(), terminal::DisableLineWrap)?;
     io::stdout().flush()?;
 
     Ok(())
 }
 
 pub fn end_terminal() -> Result<()> {
+    queue!(io::stdout(), terminal::EnableLineWrap)?;
     queue!(io::stdout(), terminal::LeaveAlternateScreen)?;
     io::stdout().flush()?;
 
@@ -55,17 +57,9 @@ pub fn end_draw(restore_state: &TerminalRestoreState) -> Result<()> {
     Ok(())
 }
 
-pub fn size() -> Result<TerminalSize> {
+pub fn size_u64() -> Result<Vec2u> {
     let size = terminal::size()?;
-    Ok(TerminalSize {
-        x: size.0,
-        y: size.1,
-    })
-}
-
-pub fn size_u64() -> Result<Pos2u> {
-    let size = terminal::size()?;
-    Ok(Pos2u {
+    Ok(Vec2u {
         x: size.0.into(),
         y: size.1.into(),
     })
@@ -95,4 +89,11 @@ pub fn draw_text<T: AsRef<str>>(pos: TerminalPos, text: T) -> Result<()> {
 fn get_cursor_pos() -> Result<TerminalPos> {
     let pos = cursor::position()?;
     Ok(TerminalPos { x: pos.0, y: pos.1 })
+}
+
+pub fn set_title<T: AsRef<str>>(title: T) -> Result<()> {
+    queue!(io::stdout(), terminal::SetTitle(title.as_ref()))?;
+    io::stdout().flush()?;
+
+    Ok(())
 }

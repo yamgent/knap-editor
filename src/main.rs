@@ -8,9 +8,12 @@
 )]
 
 mod buffer;
+mod command_bar;
 mod commands;
 mod editor;
 mod math;
+mod message_bar;
+mod status_bar;
 mod terminal;
 mod text_line;
 mod view;
