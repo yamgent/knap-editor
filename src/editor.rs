@@ -27,8 +27,8 @@ fn setup_panic_hook() {
 pub struct Editor {
     should_quit: bool,
 
-    // this is used to block the user if he tries to
-    // quit the editor without saving a modified file
+    /// this is used to block the user if he tries to
+    /// quit the editor without saving a modified file
     block_quit_remaining_tries: usize,
 
     view: View,
