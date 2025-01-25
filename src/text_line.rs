@@ -247,7 +247,7 @@ impl TextLine {
                 .iter()
                 .enumerate()
                 .find_map(|(fragment_idx, fragment)| {
-                    if fragment.start_byte_index == byte_idx {
+                    if fragment.start_byte_index >= byte_idx {
                         Some(fragment_idx)
                     } else {
                         None
