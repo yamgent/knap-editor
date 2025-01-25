@@ -6,6 +6,7 @@ use crate::{
     message_bar::MessageBar,
     terminal::{self, TerminalPos},
     text_line::TextLine,
+    view::View,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -20,7 +21,7 @@ impl CommandBarPrompt {
         match self {
             CommandBarPrompt::None => String::new(),
             CommandBarPrompt::SaveAs => "Save As: ".to_string(),
-            CommandBarPrompt::Search => "Search: ".to_string(),
+            CommandBarPrompt::Search => "Search (Esc to cancel): ".to_string(),
         }
     }
 }
@@ -176,12 +177,19 @@ impl CommandBar {
         self.adjust_scroll_to_caret_grid_pos();
     }
 
+    fn on_input_updated(&self, view: &mut View) {
+        if matches!(self.prompt, CommandBarPrompt::Search) {
+            view.find_first_and_adjust_view(self.input.to_string());
+        }
+    }
+
     // splitting the function up doesn't change the readability much
     #[allow(clippy::too_many_lines)]
     pub fn execute_command(
         &mut self,
         command: EditorCommand,
         message_bar: &mut MessageBar,
+        view: &mut View,
     ) -> CommandBarExecuteResult {
         match command {
             EditorCommand::QuitAll
@@ -239,6 +247,7 @@ impl CommandBar {
                         if result.line_len_increased {
                             self.change_caret_x(self.caret_pos.x.saturating_add(1));
                         }
+                        self.on_input_updated(view);
                         CommandBarExecuteResult {
                             is_command_handled: true,
                             submitted_data: None,
@@ -264,6 +273,7 @@ impl CommandBar {
                         .remove_character(self.caret_pos.x.saturating_sub(1).to_usize_clamp());
 
                     self.change_caret_x(self.caret_pos.x.saturating_sub(1));
+                    self.on_input_updated(view);
                 }
                 CommandBarExecuteResult {
                     is_command_handled: true,
@@ -274,6 +284,7 @@ impl CommandBar {
                 if self.caret_pos.x < self.input.get_line_len().to_u64() {
                     self.input
                         .remove_character(self.caret_pos.x.to_usize_clamp());
+                    self.on_input_updated(view);
                 }
                 CommandBarExecuteResult {
                     is_command_handled: true,
@@ -286,7 +297,8 @@ impl CommandBar {
                         message_bar.set_message("Save aborted");
                     }
                     CommandBarPrompt::Search => {
-                        message_bar.set_message("Search exited");
+                        view.abort_search();
+                        message_bar.set_message("Search aborted");
                     }
                     CommandBarPrompt::None => {}
                 }

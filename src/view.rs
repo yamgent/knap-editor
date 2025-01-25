@@ -28,6 +28,9 @@ pub struct View {
     /// x. Otherwise it would be very disorientating. That's the
     /// job of this variable.
     previous_line_caret_max_x: Option<u64>,
+
+    before_search_caret_pos: Option<Vec2u>,
+    before_search_scroll_offset: Option<Vec2u>,
 }
 
 impl View {
@@ -38,6 +41,8 @@ impl View {
             caret_pos: Vec2u::ZERO,
             scroll_offset: Vec2u::ZERO,
             previous_line_caret_max_x: None,
+            before_search_caret_pos: None,
+            before_search_scroll_offset: None,
         }
     }
 
@@ -195,6 +200,33 @@ impl View {
         self.caret_pos = new_pos;
         self.adjust_scroll_to_caret_grid_pos();
         self.previous_line_caret_max_x.take();
+    }
+
+    fn start_search(&mut self, command_bar: &mut CommandBar) {
+        self.before_search_caret_pos = Some(self.caret_pos);
+        self.before_search_scroll_offset = Some(self.scroll_offset);
+
+        command_bar.set_prompt(CommandBarPrompt::Search);
+    }
+
+    pub fn abort_search(&mut self) {
+        self.caret_pos = self
+            .before_search_caret_pos
+            .take()
+            .unwrap_or(self.caret_pos);
+
+        self.scroll_offset = self
+            .before_search_scroll_offset
+            .take()
+            .unwrap_or(self.scroll_offset);
+    }
+
+    pub fn find_first_and_adjust_view<T: AsRef<str>>(&mut self, search: T) {
+        if let Some(caret_pos) = self.buffer.find_first(search) {
+            self.change_caret_xy(caret_pos);
+        } else if let Some(previous_caret_pos) = self.before_search_caret_pos {
+            self.change_caret_xy(previous_caret_pos);
+        }
     }
 
     // splitting the function up doesn't change the readability much
@@ -367,7 +399,7 @@ impl View {
                 true
             }
             EditorCommand::StartSearch => {
-                command_bar.set_prompt(CommandBarPrompt::Search);
+                self.start_search(command_bar);
                 true
             }
             EditorCommand::QuitAll | EditorCommand::Dismiss => false,

@@ -3,6 +3,7 @@ use std::{fs::File, io::Write, ops::Range};
 use anyhow::Result;
 
 use crate::{
+    math::{ToU64, Vec2u},
     terminal::{self, TerminalPos},
     text_line::{InsertCharError, InsertCharResult, TextLine},
 };
@@ -155,5 +156,17 @@ impl Buffer {
         }
 
         self.is_dirty = true;
+    }
+
+    pub fn find_first<T: AsRef<str>>(&self, search: T) -> Option<Vec2u> {
+        self.content
+            .iter()
+            .enumerate()
+            .find_map(|(line_idx, line)| {
+                line.find_first(&search).map(|fragment_idx| Vec2u {
+                    x: fragment_idx.to_u64(),
+                    y: line_idx.to_u64(),
+                })
+            })
     }
 }

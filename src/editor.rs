@@ -144,9 +144,9 @@ impl Editor {
             }
             true
         } else if self.command_bar.has_active_prompt() {
-            let result = self
-                .command_bar
-                .execute_command(command, &mut self.message_bar);
+            let result =
+                self.command_bar
+                    .execute_command(command, &mut self.message_bar, &mut self.view);
 
             if let Some((prompt, value)) = result.submitted_data {
                 self.command_bar.clear_prompt();

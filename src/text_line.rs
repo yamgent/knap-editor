@@ -240,6 +240,21 @@ impl TextLine {
         *self = Self::new(left);
         Self::new(right)
     }
+
+    pub fn find_first<T: AsRef<str>>(&self, search: T) -> Option<usize> {
+        self.string.find(search.as_ref()).and_then(|byte_idx| {
+            self.fragments
+                .iter()
+                .enumerate()
+                .find_map(|(fragment_idx, fragment)| {
+                    if fragment.start_byte_index == byte_idx {
+                        Some(fragment_idx)
+                    } else {
+                        None
+                    }
+                })
+        })
+    }
 }
 
 impl Display for TextLine {
