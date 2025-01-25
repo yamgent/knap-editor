@@ -25,10 +25,14 @@ struct TextFragment {
     grapheme: String,
     rendered_width: GraphemeWidth,
     replacement: Option<char>,
+    // TODO: Remove this once we start using this
+    #[allow(dead_code)]
+    start_byte_index: usize,
 }
 
 pub struct TextLine {
     fragments: Vec<TextFragment>,
+    string: String,
 }
 
 pub struct InsertCharResult {
@@ -83,13 +87,14 @@ fn get_grapheme_render_replacement<T: AsRef<str>>(grapheme: T) -> Option<(char, 
 fn build_fragments_from_string<T: AsRef<str>>(content: T) -> Vec<TextFragment> {
     content
         .as_ref()
-        .graphemes(true)
-        .map(|grapheme| {
+        .grapheme_indices(true)
+        .map(|(start_byte_index, grapheme)| {
             if let Some((replacement, rendered_width)) = get_grapheme_render_replacement(grapheme) {
                 TextFragment {
                     grapheme: grapheme.to_string(),
                     rendered_width,
                     replacement: Some(replacement),
+                    start_byte_index,
                 }
             } else {
                 TextFragment {
@@ -100,6 +105,7 @@ fn build_fragments_from_string<T: AsRef<str>>(content: T) -> Vec<TextFragment> {
                         GraphemeWidth::Full
                     },
                     replacement: None,
+                    start_byte_index,
                 }
             }
         })
@@ -109,7 +115,8 @@ fn build_fragments_from_string<T: AsRef<str>>(content: T) -> Vec<TextFragment> {
 impl TextLine {
     pub fn new<T: AsRef<str>>(content: T) -> Self {
         Self {
-            fragments: build_fragments_from_string(content),
+            fragments: build_fragments_from_string(&content),
+            string: content.as_ref().to_string(),
         }
     }
 
@@ -195,7 +202,7 @@ impl TextLine {
                     .map(|fragment| fragment.grapheme.clone()),
             );
 
-            self.fragments = build_fragments_from_string(new_string);
+            *self = Self::new(new_string);
 
             Ok(InsertCharResult {
                 line_len_increased: self.fragments.len() > old_fragments_len,
@@ -212,7 +219,7 @@ impl TextLine {
                 .filter(|(idx, _)| *idx != fragment_idx)
                 .map(|(_, fragment)| fragment.grapheme.clone())
                 .collect::<String>();
-            self.fragments = build_fragments_from_string(new_string);
+            *self = Self::new(new_string);
         }
     }
 
@@ -230,20 +237,13 @@ impl TextLine {
             .map(|fragment| fragment.grapheme.clone())
             .collect::<String>();
 
-        self.fragments = build_fragments_from_string(left);
+        *self = Self::new(left);
         Self::new(right)
     }
 }
 
 impl Display for TextLine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.fragments
-                .iter()
-                .map(|fragment| fragment.grapheme.clone())
-                .collect::<String>()
-        )
+        write!(f, "{}", self.string)
     }
 }
