@@ -366,6 +366,10 @@ impl View {
                 }
                 true
             }
+            EditorCommand::StartSearch => {
+                command_bar.set_prompt(CommandBarPrompt::Search);
+                true
+            }
             EditorCommand::QuitAll | EditorCommand::Dismiss => false,
         }
     }

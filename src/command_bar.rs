@@ -12,6 +12,7 @@ use crate::{
 pub enum CommandBarPrompt {
     None,
     SaveAs,
+    Search,
 }
 
 impl CommandBarPrompt {
@@ -19,6 +20,7 @@ impl CommandBarPrompt {
         match self {
             CommandBarPrompt::None => String::new(),
             CommandBarPrompt::SaveAs => "Save As: ".to_string(),
+            CommandBarPrompt::Search => "Search: ".to_string(),
         }
     }
 }
@@ -60,6 +62,8 @@ impl CommandBar {
     pub fn clear_prompt(&mut self) {
         self.prompt = CommandBarPrompt::None;
         self.input = TextLine::new("");
+        self.caret_pos = Vec2u::ZERO;
+        self.scroll_offset = Vec2u::ZERO;
     }
 
     pub fn set_prompt(&mut self, prompt: CommandBarPrompt) {
@@ -180,7 +184,9 @@ impl CommandBar {
         message_bar: &mut MessageBar,
     ) -> CommandBarExecuteResult {
         match command {
-            EditorCommand::QuitAll | EditorCommand::WriteBufferToDisk => CommandBarExecuteResult {
+            EditorCommand::QuitAll
+            | EditorCommand::WriteBufferToDisk
+            | EditorCommand::StartSearch => CommandBarExecuteResult {
                 is_command_handled: false,
                 submitted_data: None,
             },
@@ -275,8 +281,14 @@ impl CommandBar {
                 }
             }
             EditorCommand::Dismiss => {
-                if matches!(self.prompt, CommandBarPrompt::SaveAs) {
-                    message_bar.set_message("Save aborted");
+                match self.prompt {
+                    CommandBarPrompt::SaveAs => {
+                        message_bar.set_message("Save aborted");
+                    }
+                    CommandBarPrompt::Search => {
+                        message_bar.set_message("Search exited");
+                    }
+                    CommandBarPrompt::None => {}
                 }
 
                 self.clear_prompt();

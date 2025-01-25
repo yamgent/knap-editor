@@ -70,7 +70,7 @@ impl Editor {
                 y: 1,
             },
         });
-        message_bar.set_message("HELP: Ctrl-S = save | Ctrl-Q = quit");
+        message_bar.set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
 
         let command_bar = CommandBar::new(Bounds2u {
             pos: Vec2u {
@@ -218,6 +218,9 @@ impl Editor {
                         Some(EditorCommand::WriteBufferToDisk)
                     }
                     (&KeyModifiers::NONE, &KeyCode::Esc) => Some(EditorCommand::Dismiss),
+                    (&KeyModifiers::CONTROL, &KeyCode::Char('f')) => {
+                        Some(EditorCommand::StartSearch)
+                    }
                     _ => None,
                 };
 

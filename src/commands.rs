@@ -15,4 +15,5 @@ pub enum EditorCommand {
     EraseCharacterAfterCursor,
     WriteBufferToDisk,
     Dismiss,
+    StartSearch,
 }
