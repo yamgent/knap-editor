@@ -244,14 +244,7 @@ impl TextLine {
     fn get_fragment_idx_from_byte_idx(&self, byte_idx: usize) -> Option<usize> {
         self.fragments
             .iter()
-            .enumerate()
-            .find_map(|(fragment_idx, fragment)| {
-                if fragment.start_byte_index >= byte_idx {
-                    Some(fragment_idx)
-                } else {
-                    None
-                }
-            })
+            .position(|fragment| fragment.start_byte_index >= byte_idx)
     }
 
     fn get_byte_idx_from_fragment_idx(&self, fragment_idx: usize) -> Option<usize> {
@@ -263,8 +256,9 @@ impl TextLine {
     pub fn find<T: AsRef<str>>(&self, search: T, start_from_fragment_idx: usize) -> Option<usize> {
         let start_byte_idx = self.get_byte_idx_from_fragment_idx(start_from_fragment_idx)?;
 
-        self.string[start_byte_idx..]
-            .find(search.as_ref())
+        self.string
+            .get(start_byte_idx..)
+            .and_then(|substr| substr.find(search.as_ref()))
             .and_then(|byte_idx| {
                 self.get_fragment_idx_from_byte_idx(byte_idx.saturating_add(start_byte_idx))
             })
