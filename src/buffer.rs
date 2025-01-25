@@ -3,7 +3,7 @@ use std::{fs::File, io::Write, ops::Range};
 use anyhow::Result;
 
 use crate::{
-    math::{ToU64, Vec2u},
+    math::{ToU64, ToUsizeClamp, Vec2u},
     terminal::{self, TerminalPos},
     text_line::{InsertCharError, InsertCharResult, TextLine},
 };
@@ -158,15 +158,42 @@ impl Buffer {
         self.is_dirty = true;
     }
 
-    pub fn find_first<T: AsRef<str>>(&self, search: T) -> Option<Vec2u> {
+    pub fn find<T: AsRef<str>>(&self, search: T, start_pos: Vec2u) -> Option<Vec2u> {
+        if let Some(first_line) = self.content.get(start_pos.y.to_usize_clamp()) {
+            let first_line_result =
+                first_line
+                    .find(&search, start_pos.x.to_usize_clamp())
+                    .map(|fragment_idx| Vec2u {
+                        x: fragment_idx.to_u64(),
+                        y: start_pos.y,
+                    });
+
+            if first_line_result.is_some() {
+                return first_line_result;
+            }
+        }
+
         self.content
             .iter()
             .enumerate()
+            .skip(start_pos.y.saturating_add(1).to_usize_clamp())
             .find_map(|(line_idx, line)| {
-                line.find_first(&search).map(|fragment_idx| Vec2u {
+                line.find(&search, 0).map(|fragment_idx| Vec2u {
                     x: fragment_idx.to_u64(),
                     y: line_idx.to_u64(),
                 })
+            })
+            .or_else(|| {
+                self.content
+                    .iter()
+                    .enumerate()
+                    .take(start_pos.y.to_usize_clamp())
+                    .find_map(|(line_idx, line)| {
+                        line.find(&search, 0).map(|fragment_idx| Vec2u {
+                            x: fragment_idx.to_u64(),
+                            y: line_idx.to_u64(),
+                        })
+                    })
             })
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
     status_bar::ViewStatus,
-    terminal::TerminalPos,
+    terminal::{self, TerminalPos},
 };
 
 pub struct View {
@@ -100,7 +100,7 @@ impl View {
 
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        Ok(TerminalPos {
+        let screen_cursor_pos = TerminalPos {
             x: self.bounds.pos.x.to_u16_clamp().saturating_add(
                 grid_cursor_pos
                     .x
@@ -111,7 +111,21 @@ impl View {
                     .y
                     .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
             ),
-        })
+        };
+
+        // TODO: We did not want to mess around with the scroll for the searching idea in
+        // Assignment 29 (i.e. "Scrolling to a match should center the match on the screen"),
+        // so we opt to try and "highlight" the searched word instead to make it more obvious
+        // which word is being matched. However, we should remove this once we have proper
+        // search highlighting
+        {
+            let search_active = self.before_search_caret_pos.is_some();
+            if search_active {
+                terminal::draw_text(screen_cursor_pos, "*")?;
+            }
+        }
+
+        Ok(screen_cursor_pos)
     }
 
     fn adjust_scroll_to_caret_grid_pos(&mut self) {
@@ -221,8 +235,26 @@ impl View {
             .unwrap_or(self.scroll_offset);
     }
 
-    pub fn find_first_and_adjust_view<T: AsRef<str>>(&mut self, search: T) {
-        if let Some(caret_pos) = self.buffer.find_first(search) {
+    pub fn complete_search(&mut self) {
+        self.before_search_caret_pos.take();
+        self.before_search_scroll_offset.take();
+    }
+
+    pub fn find<T: AsRef<str>>(&mut self, search: T, first_search: bool) {
+        if let Some(caret_pos) = self.buffer.find(
+            &search,
+            if first_search {
+                self.before_search_caret_pos.unwrap_or(self.caret_pos)
+            } else {
+                Vec2u {
+                    x: self
+                        .caret_pos
+                        .x
+                        .saturating_add(search.as_ref().len().to_u64()),
+                    y: self.caret_pos.y,
+                }
+            },
+        ) {
             self.change_caret_xy(caret_pos);
         } else if let Some(previous_caret_pos) = self.before_search_caret_pos {
             self.change_caret_xy(previous_caret_pos);

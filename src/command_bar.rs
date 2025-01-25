@@ -21,7 +21,7 @@ impl CommandBarPrompt {
         match self {
             CommandBarPrompt::None => String::new(),
             CommandBarPrompt::SaveAs => "Save As: ".to_string(),
-            CommandBarPrompt::Search => "Search (Esc to cancel): ".to_string(),
+            CommandBarPrompt::Search => "Search (Esc to cancel, Arrows to navigate): ".to_string(),
         }
     }
 }
@@ -179,8 +179,12 @@ impl CommandBar {
 
     fn on_input_updated(&self, view: &mut View) {
         if matches!(self.prompt, CommandBarPrompt::Search) {
-            view.find_first_and_adjust_view(self.input.to_string());
+            view.find(self.input.to_string(), true);
         }
+    }
+
+    fn on_find_next(&self, view: &mut View) {
+        view.find(self.input.to_string(), false);
     }
 
     // splitting the function up doesn't change the readability much
@@ -198,8 +202,17 @@ impl CommandBar {
                 is_command_handled: false,
                 submitted_data: None,
             },
+            EditorCommand::MoveCursorDown => {
+                if matches!(self.prompt, CommandBarPrompt::Search) {
+                    self.on_find_next(view);
+                }
+
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: None,
+                }
+            }
             EditorCommand::MoveCursorUp
-            | EditorCommand::MoveCursorDown
             | EditorCommand::MoveCursorUpOnePage
             | EditorCommand::MoveCursorDownOnePage => CommandBarExecuteResult {
                 is_command_handled: true,
@@ -259,14 +272,20 @@ impl CommandBar {
                     },
                 }
             }
-            EditorCommand::InsertNewline => CommandBarExecuteResult {
-                is_command_handled: true,
-                submitted_data: if self.input.get_line_len() > 0 {
-                    Some((self.prompt, self.input.to_string()))
-                } else {
-                    None
-                },
-            },
+            EditorCommand::InsertNewline => {
+                if matches!(self.prompt, CommandBarPrompt::Search) {
+                    view.complete_search();
+                }
+
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: if self.input.get_line_len() > 0 {
+                        Some((self.prompt, self.input.to_string()))
+                    } else {
+                        None
+                    },
+                }
+            }
             EditorCommand::EraseCharacterBeforeCursor => {
                 if self.caret_pos.x > 0 {
                     self.input
