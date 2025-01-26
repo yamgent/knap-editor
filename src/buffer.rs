@@ -187,52 +187,33 @@ impl Buffer {
                 .content
                 .iter()
                 .enumerate()
+                .cycle()
                 .skip(start_pos.y.saturating_add(1).to_usize_clamp())
+                .take(self.content.len().saturating_sub(1))
                 .find_map(|(line_idx, line)| {
                     line.find(&search, None, search_direction)
                         .map(|fragment_idx| Vec2u {
                             x: fragment_idx.to_u64(),
                             y: line_idx.to_u64(),
-                        })
-                })
-                .or_else(|| {
-                    self.content
-                        .iter()
-                        .enumerate()
-                        .take(start_pos.y.to_usize_clamp())
-                        .find_map(|(line_idx, line)| {
-                            line.find(&search, None, search_direction)
-                                .map(|fragment_idx| Vec2u {
-                                    x: fragment_idx.to_u64(),
-                                    y: line_idx.to_u64(),
-                                })
                         })
                 }),
             SearchDirection::Backward => self
                 .content
                 .iter()
                 .enumerate()
-                .take(start_pos.y.to_usize_clamp())
                 .rev()
+                .cycle()
+                .skip(
+                    self.content
+                        .len()
+                        .saturating_sub(start_pos.y.to_usize_clamp()),
+                )
+                .take(self.content.len().saturating_sub(1))
                 .find_map(|(line_idx, line)| {
                     line.find(&search, None, search_direction)
                         .map(|fragment_idx| Vec2u {
                             x: fragment_idx.to_u64(),
                             y: line_idx.to_u64(),
-                        })
-                })
-                .or_else(|| {
-                    self.content
-                        .iter()
-                        .enumerate()
-                        .skip(start_pos.y.saturating_add(1).to_usize_clamp())
-                        .rev()
-                        .find_map(|(line_idx, line)| {
-                            line.find(&search, None, search_direction)
-                                .map(|fragment_idx| Vec2u {
-                                    x: fragment_idx.to_u64(),
-                                    y: line_idx.to_u64(),
-                                })
                         })
                 }),
         }
