@@ -4,7 +4,10 @@ use anyhow::Result;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::terminal::{self, TerminalPos};
+use crate::{
+    search::SearchDirection,
+    terminal::{self, TerminalPos},
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum GraphemeWidth {
@@ -253,15 +256,38 @@ impl TextLine {
             .map(|fragment| fragment.start_byte_index)
     }
 
-    pub fn find<T: AsRef<str>>(&self, search: T, start_from_fragment_idx: usize) -> Option<usize> {
-        let start_byte_idx = self.get_byte_idx_from_fragment_idx(start_from_fragment_idx)?;
+    pub fn find<T: AsRef<str>>(
+        &self,
+        search: T,
+        start_from_fragment_idx: Option<usize>,
+        search_direction: SearchDirection,
+    ) -> Option<usize> {
+        let start_byte_idx = match start_from_fragment_idx {
+            Some(start_from_fragment_idx) => {
+                self.get_byte_idx_from_fragment_idx(start_from_fragment_idx)?
+            }
+            None => match search_direction {
+                SearchDirection::Forward => 0,
+                SearchDirection::Backward => self.string.len().saturating_sub(1),
+            },
+        };
+        let all_indices = self
+            .string
+            .match_indices(search.as_ref())
+            .map(|entries| entries.0)
+            .collect::<Vec<_>>();
 
-        self.string
-            .get(start_byte_idx..)
-            .and_then(|substr| substr.find(search.as_ref()))
-            .and_then(|byte_idx| {
-                self.get_fragment_idx_from_byte_idx(byte_idx.saturating_add(start_byte_idx))
-            })
+        match search_direction {
+            SearchDirection::Forward => all_indices
+                .iter()
+                .find(|byte_idx| **byte_idx >= start_byte_idx)
+                .and_then(|byte_idx| self.get_fragment_idx_from_byte_idx(*byte_idx)),
+            SearchDirection::Backward => all_indices
+                .iter()
+                .rev()
+                .find(|byte_idx| **byte_idx < start_byte_idx)
+                .and_then(|byte_idx| self.get_fragment_idx_from_byte_idx(*byte_idx)),
+        }
     }
 }
 

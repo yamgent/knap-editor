@@ -13,6 +13,7 @@ mod commands;
 mod editor;
 mod math;
 mod message_bar;
+mod search;
 mod status_bar;
 mod terminal;
 mod text_line;

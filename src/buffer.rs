@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use crate::{
     math::{ToU64, ToUsizeClamp, Vec2u},
+    search::SearchDirection,
     terminal::{self, TerminalPos},
     text_line::{InsertCharError, InsertCharResult, TextLine},
 };
@@ -158,42 +159,82 @@ impl Buffer {
         self.is_dirty = true;
     }
 
-    pub fn find<T: AsRef<str>>(&self, search: T, start_pos: Vec2u) -> Option<Vec2u> {
+    pub fn find<T: AsRef<str>>(
+        &self,
+        search: T,
+        start_pos: Vec2u,
+        search_direction: SearchDirection,
+    ) -> Option<Vec2u> {
         if let Some(first_line) = self.content.get(start_pos.y.to_usize_clamp()) {
-            let first_line_result =
-                first_line
-                    .find(&search, start_pos.x.to_usize_clamp())
-                    .map(|fragment_idx| Vec2u {
-                        x: fragment_idx.to_u64(),
-                        y: start_pos.y,
-                    });
+            let first_line_result = first_line
+                .find(
+                    &search,
+                    Some(start_pos.x.to_usize_clamp()),
+                    search_direction,
+                )
+                .map(|fragment_idx| Vec2u {
+                    x: fragment_idx.to_u64(),
+                    y: start_pos.y,
+                });
 
             if first_line_result.is_some() {
                 return first_line_result;
             }
         }
 
-        self.content
-            .iter()
-            .enumerate()
-            .skip(start_pos.y.saturating_add(1).to_usize_clamp())
-            .find_map(|(line_idx, line)| {
-                line.find(&search, 0).map(|fragment_idx| Vec2u {
-                    x: fragment_idx.to_u64(),
-                    y: line_idx.to_u64(),
-                })
-            })
-            .or_else(|| {
-                self.content
-                    .iter()
-                    .enumerate()
-                    .take(start_pos.y.to_usize_clamp())
-                    .find_map(|(line_idx, line)| {
-                        line.find(&search, 0).map(|fragment_idx| Vec2u {
+        match search_direction {
+            SearchDirection::Forward => self
+                .content
+                .iter()
+                .enumerate()
+                .skip(start_pos.y.saturating_add(1).to_usize_clamp())
+                .find_map(|(line_idx, line)| {
+                    line.find(&search, None, search_direction)
+                        .map(|fragment_idx| Vec2u {
                             x: fragment_idx.to_u64(),
                             y: line_idx.to_u64(),
                         })
-                    })
-            })
+                })
+                .or_else(|| {
+                    self.content
+                        .iter()
+                        .enumerate()
+                        .take(start_pos.y.to_usize_clamp())
+                        .find_map(|(line_idx, line)| {
+                            line.find(&search, None, search_direction)
+                                .map(|fragment_idx| Vec2u {
+                                    x: fragment_idx.to_u64(),
+                                    y: line_idx.to_u64(),
+                                })
+                        })
+                }),
+            SearchDirection::Backward => self
+                .content
+                .iter()
+                .enumerate()
+                .take(start_pos.y.to_usize_clamp())
+                .rev()
+                .find_map(|(line_idx, line)| {
+                    line.find(&search, None, search_direction)
+                        .map(|fragment_idx| Vec2u {
+                            x: fragment_idx.to_u64(),
+                            y: line_idx.to_u64(),
+                        })
+                })
+                .or_else(|| {
+                    self.content
+                        .iter()
+                        .enumerate()
+                        .skip(start_pos.y.saturating_add(1).to_usize_clamp())
+                        .rev()
+                        .find_map(|(line_idx, line)| {
+                            line.find(&search, None, search_direction)
+                                .map(|fragment_idx| Vec2u {
+                                    x: fragment_idx.to_u64(),
+                                    y: line_idx.to_u64(),
+                                })
+                        })
+                }),
+        }
     }
 }

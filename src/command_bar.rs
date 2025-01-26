@@ -4,6 +4,7 @@ use crate::{
     commands::EditorCommand,
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
+    search::SearchDirection,
     terminal::{self, TerminalPos},
     text_line::TextLine,
     view::View,
@@ -179,12 +180,16 @@ impl CommandBar {
 
     fn on_input_updated(&self, view: &mut View) {
         if matches!(self.prompt, CommandBarPrompt::Search) {
-            view.find(self.input.to_string(), true);
+            view.find(self.input.to_string(), true, SearchDirection::Forward);
         }
     }
 
     fn on_find_next(&self, view: &mut View) {
-        view.find(self.input.to_string(), false);
+        view.find(self.input.to_string(), false, SearchDirection::Forward);
+    }
+
+    fn on_find_previous(&self, view: &mut View) {
+        view.find(self.input.to_string(), false, SearchDirection::Backward);
     }
 
     // splitting the function up doesn't change the readability much
@@ -202,6 +207,16 @@ impl CommandBar {
                 is_command_handled: false,
                 submitted_data: None,
             },
+            EditorCommand::MoveCursorUp => {
+                if matches!(self.prompt, CommandBarPrompt::Search) {
+                    self.on_find_previous(view);
+                }
+
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: None,
+                }
+            }
             EditorCommand::MoveCursorDown => {
                 if matches!(self.prompt, CommandBarPrompt::Search) {
                     self.on_find_next(view);
@@ -212,12 +227,12 @@ impl CommandBar {
                     submitted_data: None,
                 }
             }
-            EditorCommand::MoveCursorUp
-            | EditorCommand::MoveCursorUpOnePage
-            | EditorCommand::MoveCursorDownOnePage => CommandBarExecuteResult {
-                is_command_handled: true,
-                submitted_data: None,
-            },
+            EditorCommand::MoveCursorUpOnePage | EditorCommand::MoveCursorDownOnePage => {
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: None,
+                }
+            }
             EditorCommand::MoveCursorLeft => {
                 self.change_caret_x(self.caret_pos.x.saturating_sub(1));
                 CommandBarExecuteResult {

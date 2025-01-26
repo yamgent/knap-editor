@@ -6,6 +6,7 @@ use crate::{
     commands::EditorCommand,
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
+    search::SearchDirection,
     status_bar::ViewStatus,
     terminal::{self, TerminalPos},
 };
@@ -240,20 +241,29 @@ impl View {
         self.before_search_scroll_offset.take();
     }
 
-    pub fn find<T: AsRef<str>>(&mut self, search: T, first_search: bool) {
+    pub fn find<T: AsRef<str>>(
+        &mut self,
+        search: T,
+        first_search: bool,
+        search_direction: SearchDirection,
+    ) {
         if let Some(caret_pos) = self.buffer.find(
             &search,
             if first_search {
                 self.before_search_caret_pos.unwrap_or(self.caret_pos)
             } else {
                 Vec2u {
-                    x: self
-                        .caret_pos
-                        .x
-                        .saturating_add(search.as_ref().len().to_u64()),
+                    x: match search_direction {
+                        SearchDirection::Forward => self
+                            .caret_pos
+                            .x
+                            .saturating_add(search.as_ref().len().to_u64()),
+                        SearchDirection::Backward => self.caret_pos.x,
+                    },
                     y: self.caret_pos.y,
                 }
             },
+            search_direction,
         ) {
             self.change_caret_xy(caret_pos);
         } else if let Some(previous_caret_pos) = self.before_search_caret_pos {
