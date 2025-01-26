@@ -268,7 +268,7 @@ impl TextLine {
             }
             None => match search_direction {
                 SearchDirection::Forward => 0,
-                SearchDirection::Backward => self.string.len().saturating_sub(1),
+                SearchDirection::Backward => self.string.len(),
             },
         };
         let all_indices = self
