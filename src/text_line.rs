@@ -137,11 +137,14 @@ impl TextLine {
             .sum()
     }
 
+    // TODO: Consider refactoring this in the future, so that we
+    // do not have to disable too_many_lines lint
+    #[allow(clippy::too_many_lines)]
     pub fn render_line(
         &self,
         screen_pos: TerminalPos,
         text_offset_x: Range<u64>,
-        search_text: Option<String>,
+        search_text: Option<&String>,
         search_cursor_x_pos: Option<u64>,
     ) -> Result<()> {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,7 +157,7 @@ impl TextLine {
         let search_highlights = match search_text {
             Some(search_text) => self
                 .string
-                .match_indices(&search_text)
+                .match_indices(search_text)
                 .map(|entries| entries.0..(entries.0.saturating_add(search_text.len())))
                 .collect::<Vec<_>>(),
             None => vec![],
@@ -178,8 +181,7 @@ impl TextLine {
                 } else {
                     let search_highlight_type = if search_highlights
                         .iter()
-                        .find(|range| range.contains(&current_fragment.start_byte_index))
-                        .is_some()
+                        .any(|range| range.contains(&current_fragment.start_byte_index))
                     {
                         if search_cursor_x_pos.is_some()
                             && current_fragment_idx

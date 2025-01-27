@@ -79,7 +79,7 @@ impl View {
         self.adjust_scroll_to_caret_grid_pos();
     }
 
-    pub fn render(&self, search_text: Option<String>) -> Result<TerminalPos> {
+    pub fn render(&self, search_text: Option<&String>) -> Result<TerminalPos> {
         (0..self.bounds.size.y)
             .map(|y| {
                 let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
@@ -95,7 +95,7 @@ impl View {
                             .saturating_add(y.to_u16_clamp()),
                     },
                     self.scroll_offset.x..(self.scroll_offset.x.saturating_add(self.bounds.size.x)),
-                    search_text.clone(),
+                    search_text,
                     if search_text.is_some() && self.caret_pos.y == line_idx.to_u64() {
                         Some(self.caret_pos.x)
                     } else {

@@ -277,7 +277,7 @@ impl Editor {
     fn draw(&self) -> Result<()> {
         let mut state = terminal::start_draw()?;
 
-        let mut new_cursor_pos = self.view.render(self.command_bar.search_text())?;
+        let mut new_cursor_pos = self.view.render(self.command_bar.search_text().as_ref())?;
         self.status_bar.render(self.view.get_status())?;
 
         if self.command_bar.has_active_prompt() {
