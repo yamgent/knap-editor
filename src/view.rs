@@ -8,7 +8,7 @@ use crate::{
     message_bar::MessageBar,
     search::SearchDirection,
     status_bar::ViewStatus,
-    terminal::{self, TerminalPos},
+    terminal::TerminalPos,
 };
 
 pub struct View {
@@ -79,11 +79,12 @@ impl View {
         self.adjust_scroll_to_caret_grid_pos();
     }
 
-    pub fn render(&self) -> Result<TerminalPos> {
+    pub fn render(&self, search_text: Option<String>) -> Result<TerminalPos> {
         (0..self.bounds.size.y)
             .map(|y| {
+                let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
                 self.buffer.render_line(
-                    (self.scroll_offset.y.saturating_add(y)).to_usize_clamp(),
+                    line_idx,
                     TerminalPos {
                         x: self.bounds.pos.x.to_u16_clamp(),
                         y: self
@@ -94,6 +95,12 @@ impl View {
                             .saturating_add(y.to_u16_clamp()),
                     },
                     self.scroll_offset.x..(self.scroll_offset.x.saturating_add(self.bounds.size.x)),
+                    search_text.clone(),
+                    if search_text.is_some() && self.caret_pos.y == line_idx.to_u64() {
+                        Some(self.caret_pos.x)
+                    } else {
+                        None
+                    },
                 )
             })
             .find(Result::is_err)
@@ -113,18 +120,6 @@ impl View {
                     .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
             ),
         };
-
-        // TODO: We did not want to mess around with the scroll for the searching idea in
-        // Assignment 29 (i.e. "Scrolling to a match should center the match on the screen"),
-        // so we opt to try and "highlight" the searched word instead to make it more obvious
-        // which word is being matched. However, we should remove this once we have proper
-        // search highlighting
-        {
-            let search_active = self.before_search_caret_pos.is_some();
-            if search_active {
-                terminal::draw_text(screen_cursor_pos, "*")?;
-            }
-        }
 
         Ok(screen_cursor_pos)
     }

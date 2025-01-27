@@ -72,6 +72,14 @@ impl CommandBar {
         self.prompt = prompt;
     }
 
+    pub fn search_text(&self) -> Option<String> {
+        if matches!(self.prompt, CommandBarPrompt::Search) {
+            Some(self.input.to_string())
+        } else {
+            None
+        }
+    }
+
     pub fn has_active_prompt(&self) -> bool {
         !matches!(self.prompt, CommandBarPrompt::None)
     }
@@ -114,6 +122,8 @@ impl CommandBar {
                     y: self.bounds.pos.y.to_u16_clamp(),
                 },
                 self.scroll_offset.x..(self.scroll_offset.x.saturating_add(input_bounds.size.x)),
+                None,
+                None,
             )?;
 
             let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);

@@ -83,9 +83,13 @@ impl Buffer {
         line_idx: usize,
         screen_pos: TerminalPos,
         text_offset_x: Range<u64>,
+        search_text: Option<String>,
+        search_cursor_pos: Option<u64>,
     ) -> Result<()> {
         match self.content.get(line_idx) {
-            Some(line) => line.render_line(screen_pos, text_offset_x),
+            Some(line) => {
+                line.render_line(screen_pos, text_offset_x, search_text, search_cursor_pos)
+            }
             None => terminal::draw_text(screen_pos, "~"),
         }
     }
