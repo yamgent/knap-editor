@@ -1,7 +1,11 @@
 use std::io::{self, Write};
 
 use anyhow::Result;
-use crossterm::{cursor, queue, style, terminal};
+use crossterm::{
+    cursor, queue,
+    style::{self, Color},
+    terminal,
+};
 
 use crate::math::Vec2u;
 
@@ -83,6 +87,31 @@ fn move_cursor(pos: TerminalPos) -> Result<()> {
 pub fn draw_text<T: AsRef<str>>(pos: TerminalPos, text: T) -> Result<()> {
     move_cursor(pos)?;
     queue!(io::stdout(), style::Print(text.as_ref()))?;
+    Ok(())
+}
+
+pub fn draw_colored_text<T: AsRef<str>>(
+    pos: TerminalPos,
+    text: T,
+    foreground: Option<Color>,
+    background: Option<Color>,
+) -> Result<()> {
+    move_cursor(pos)?;
+
+    if let Some(foreground) = foreground {
+        queue!(io::stdout(), style::SetForegroundColor(foreground))?;
+    }
+
+    if let Some(background) = background {
+        queue!(io::stdout(), style::SetBackgroundColor(background))?;
+    }
+
+    queue!(io::stdout(), style::Print(text.as_ref()))?;
+
+    if foreground.is_some() || background.is_some() {
+        queue!(io::stdout(), style::ResetColor)?;
+    }
+
     Ok(())
 }
 

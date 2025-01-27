@@ -70,7 +70,7 @@ impl Editor {
                 y: 1,
             },
         });
-        message_bar.set_message("HELP: Ctrl-S = save | Ctrl-Q = quit");
+        message_bar.set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
 
         let command_bar = CommandBar::new(Bounds2u {
             pos: Vec2u {
@@ -144,9 +144,9 @@ impl Editor {
             }
             true
         } else if self.command_bar.has_active_prompt() {
-            let result = self
-                .command_bar
-                .execute_command(command, &mut self.message_bar);
+            let result =
+                self.command_bar
+                    .execute_command(command, &mut self.message_bar, &mut self.view);
 
             if let Some((prompt, value)) = result.submitted_data {
                 self.command_bar.clear_prompt();
@@ -218,6 +218,9 @@ impl Editor {
                         Some(EditorCommand::WriteBufferToDisk)
                     }
                     (&KeyModifiers::NONE, &KeyCode::Esc) => Some(EditorCommand::Dismiss),
+                    (&KeyModifiers::CONTROL, &KeyCode::Char('f')) => {
+                        Some(EditorCommand::StartSearch)
+                    }
                     _ => None,
                 };
 
@@ -274,7 +277,7 @@ impl Editor {
     fn draw(&self) -> Result<()> {
         let mut state = terminal::start_draw()?;
 
-        let mut new_cursor_pos = self.view.render()?;
+        let mut new_cursor_pos = self.view.render(self.command_bar.search_text().as_ref())?;
         self.status_bar.render(self.view.get_status())?;
 
         if self.command_bar.has_active_prompt() {

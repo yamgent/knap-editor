@@ -6,6 +6,7 @@ use crate::{
     commands::EditorCommand,
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
+    search::SearchDirection,
     status_bar::ViewStatus,
     terminal::TerminalPos,
 };
@@ -28,6 +29,9 @@ pub struct View {
     /// x. Otherwise it would be very disorientating. That's the
     /// job of this variable.
     previous_line_caret_max_x: Option<u64>,
+
+    before_search_caret_pos: Option<Vec2u>,
+    before_search_scroll_offset: Option<Vec2u>,
 }
 
 impl View {
@@ -38,6 +42,8 @@ impl View {
             caret_pos: Vec2u::ZERO,
             scroll_offset: Vec2u::ZERO,
             previous_line_caret_max_x: None,
+            before_search_caret_pos: None,
+            before_search_scroll_offset: None,
         }
     }
 
@@ -73,11 +79,12 @@ impl View {
         self.adjust_scroll_to_caret_grid_pos();
     }
 
-    pub fn render(&self) -> Result<TerminalPos> {
+    pub fn render(&self, search_text: Option<&String>) -> Result<TerminalPos> {
         (0..self.bounds.size.y)
             .map(|y| {
+                let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
                 self.buffer.render_line(
-                    (self.scroll_offset.y.saturating_add(y)).to_usize_clamp(),
+                    line_idx,
                     TerminalPos {
                         x: self.bounds.pos.x.to_u16_clamp(),
                         y: self
@@ -88,6 +95,12 @@ impl View {
                             .saturating_add(y.to_u16_clamp()),
                     },
                     self.scroll_offset.x..(self.scroll_offset.x.saturating_add(self.bounds.size.x)),
+                    search_text,
+                    if search_text.is_some() && self.caret_pos.y == line_idx.to_u64() {
+                        Some(self.caret_pos.x)
+                    } else {
+                        None
+                    },
                 )
             })
             .find(Result::is_err)
@@ -95,7 +108,7 @@ impl View {
 
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        Ok(TerminalPos {
+        let screen_cursor_pos = TerminalPos {
             x: self.bounds.pos.x.to_u16_clamp().saturating_add(
                 grid_cursor_pos
                     .x
@@ -106,7 +119,9 @@ impl View {
                     .y
                     .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
             ),
-        })
+        };
+
+        Ok(screen_cursor_pos)
     }
 
     fn adjust_scroll_to_caret_grid_pos(&mut self) {
@@ -195,6 +210,60 @@ impl View {
         self.caret_pos = new_pos;
         self.adjust_scroll_to_caret_grid_pos();
         self.previous_line_caret_max_x.take();
+    }
+
+    fn start_search(&mut self, command_bar: &mut CommandBar) {
+        self.before_search_caret_pos = Some(self.caret_pos);
+        self.before_search_scroll_offset = Some(self.scroll_offset);
+
+        command_bar.set_prompt(CommandBarPrompt::Search);
+    }
+
+    pub fn abort_search(&mut self) {
+        self.caret_pos = self
+            .before_search_caret_pos
+            .take()
+            .unwrap_or(self.caret_pos);
+
+        self.scroll_offset = self
+            .before_search_scroll_offset
+            .take()
+            .unwrap_or(self.scroll_offset);
+    }
+
+    pub fn complete_search(&mut self) {
+        self.before_search_caret_pos.take();
+        self.before_search_scroll_offset.take();
+    }
+
+    pub fn find<T: AsRef<str>>(
+        &mut self,
+        search: T,
+        first_search: bool,
+        search_direction: SearchDirection,
+    ) {
+        if let Some(caret_pos) = self.buffer.find(
+            &search,
+            if first_search {
+                self.before_search_caret_pos.unwrap_or(self.caret_pos)
+            } else {
+                Vec2u {
+                    x: match search_direction {
+                        SearchDirection::Forward => self
+                            .caret_pos
+                            .x
+                            .saturating_add(search.as_ref().len().to_u64()),
+                        SearchDirection::Backward => self.caret_pos.x,
+                    },
+                    y: self.caret_pos.y,
+                }
+            },
+            search_direction,
+        ) {
+            self.change_caret_xy(caret_pos);
+        } else if let Some(previous_caret_pos) = self.before_search_caret_pos {
+            self.change_caret_xy(previous_caret_pos);
+        }
     }
 
     // splitting the function up doesn't change the readability much
@@ -364,6 +433,10 @@ impl View {
                         Err(err) => message_bar.set_message(format!("Error writing file: {err:?}")),
                     }
                 }
+                true
+            }
+            EditorCommand::StartSearch => {
+                self.start_search(command_bar);
                 true
             }
             EditorCommand::QuitAll | EditorCommand::Dismiss => false,

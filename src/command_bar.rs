@@ -4,14 +4,17 @@ use crate::{
     commands::EditorCommand,
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
+    search::SearchDirection,
     terminal::{self, TerminalPos},
     text_line::TextLine,
+    view::View,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CommandBarPrompt {
     None,
     SaveAs,
+    Search,
 }
 
 impl CommandBarPrompt {
@@ -19,6 +22,7 @@ impl CommandBarPrompt {
         match self {
             CommandBarPrompt::None => String::new(),
             CommandBarPrompt::SaveAs => "Save As: ".to_string(),
+            CommandBarPrompt::Search => "Search (Esc to cancel, Arrows to navigate): ".to_string(),
         }
     }
 }
@@ -60,10 +64,20 @@ impl CommandBar {
     pub fn clear_prompt(&mut self) {
         self.prompt = CommandBarPrompt::None;
         self.input = TextLine::new("");
+        self.caret_pos = Vec2u::ZERO;
+        self.scroll_offset = Vec2u::ZERO;
     }
 
     pub fn set_prompt(&mut self, prompt: CommandBarPrompt) {
         self.prompt = prompt;
+    }
+
+    pub fn search_text(&self) -> Option<String> {
+        if matches!(self.prompt, CommandBarPrompt::Search) {
+            Some(self.input.to_string())
+        } else {
+            None
+        }
     }
 
     pub fn has_active_prompt(&self) -> bool {
@@ -108,6 +122,8 @@ impl CommandBar {
                     y: self.bounds.pos.y.to_u16_clamp(),
                 },
                 self.scroll_offset.x..(self.scroll_offset.x.saturating_add(input_bounds.size.x)),
+                None,
+                None,
             )?;
 
             let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
@@ -172,25 +188,61 @@ impl CommandBar {
         self.adjust_scroll_to_caret_grid_pos();
     }
 
+    fn on_input_updated(&self, view: &mut View) {
+        if matches!(self.prompt, CommandBarPrompt::Search) {
+            view.find(self.input.to_string(), true, SearchDirection::Forward);
+        }
+    }
+
+    fn on_find_next(&self, view: &mut View) {
+        view.find(self.input.to_string(), false, SearchDirection::Forward);
+    }
+
+    fn on_find_previous(&self, view: &mut View) {
+        view.find(self.input.to_string(), false, SearchDirection::Backward);
+    }
+
     // splitting the function up doesn't change the readability much
     #[allow(clippy::too_many_lines)]
     pub fn execute_command(
         &mut self,
         command: EditorCommand,
         message_bar: &mut MessageBar,
+        view: &mut View,
     ) -> CommandBarExecuteResult {
         match command {
-            EditorCommand::QuitAll | EditorCommand::WriteBufferToDisk => CommandBarExecuteResult {
+            EditorCommand::QuitAll
+            | EditorCommand::WriteBufferToDisk
+            | EditorCommand::StartSearch => CommandBarExecuteResult {
                 is_command_handled: false,
                 submitted_data: None,
             },
-            EditorCommand::MoveCursorUp
-            | EditorCommand::MoveCursorDown
-            | EditorCommand::MoveCursorUpOnePage
-            | EditorCommand::MoveCursorDownOnePage => CommandBarExecuteResult {
-                is_command_handled: true,
-                submitted_data: None,
-            },
+            EditorCommand::MoveCursorUp => {
+                if matches!(self.prompt, CommandBarPrompt::Search) {
+                    self.on_find_previous(view);
+                }
+
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: None,
+                }
+            }
+            EditorCommand::MoveCursorDown => {
+                if matches!(self.prompt, CommandBarPrompt::Search) {
+                    self.on_find_next(view);
+                }
+
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: None,
+                }
+            }
+            EditorCommand::MoveCursorUpOnePage | EditorCommand::MoveCursorDownOnePage => {
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: None,
+                }
+            }
             EditorCommand::MoveCursorLeft => {
                 self.change_caret_x(self.caret_pos.x.saturating_sub(1));
                 CommandBarExecuteResult {
@@ -233,6 +285,7 @@ impl CommandBar {
                         if result.line_len_increased {
                             self.change_caret_x(self.caret_pos.x.saturating_add(1));
                         }
+                        self.on_input_updated(view);
                         CommandBarExecuteResult {
                             is_command_handled: true,
                             submitted_data: None,
@@ -244,20 +297,27 @@ impl CommandBar {
                     },
                 }
             }
-            EditorCommand::InsertNewline => CommandBarExecuteResult {
-                is_command_handled: true,
-                submitted_data: if self.input.get_line_len() > 0 {
-                    Some((self.prompt, self.input.to_string()))
-                } else {
-                    None
-                },
-            },
+            EditorCommand::InsertNewline => {
+                if matches!(self.prompt, CommandBarPrompt::Search) {
+                    view.complete_search();
+                }
+
+                CommandBarExecuteResult {
+                    is_command_handled: true,
+                    submitted_data: if self.input.get_line_len() > 0 {
+                        Some((self.prompt, self.input.to_string()))
+                    } else {
+                        None
+                    },
+                }
+            }
             EditorCommand::EraseCharacterBeforeCursor => {
                 if self.caret_pos.x > 0 {
                     self.input
                         .remove_character(self.caret_pos.x.saturating_sub(1).to_usize_clamp());
 
                     self.change_caret_x(self.caret_pos.x.saturating_sub(1));
+                    self.on_input_updated(view);
                 }
                 CommandBarExecuteResult {
                     is_command_handled: true,
@@ -268,6 +328,7 @@ impl CommandBar {
                 if self.caret_pos.x < self.input.get_line_len().to_u64() {
                     self.input
                         .remove_character(self.caret_pos.x.to_usize_clamp());
+                    self.on_input_updated(view);
                 }
                 CommandBarExecuteResult {
                     is_command_handled: true,
@@ -275,8 +336,15 @@ impl CommandBar {
                 }
             }
             EditorCommand::Dismiss => {
-                if matches!(self.prompt, CommandBarPrompt::SaveAs) {
-                    message_bar.set_message("Save aborted");
+                match self.prompt {
+                    CommandBarPrompt::SaveAs => {
+                        message_bar.set_message("Save aborted");
+                    }
+                    CommandBarPrompt::Search => {
+                        view.abort_search();
+                        message_bar.set_message("Search aborted");
+                    }
+                    CommandBarPrompt::None => {}
                 }
 
                 self.clear_prompt();
