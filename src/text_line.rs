@@ -30,8 +30,6 @@ struct TextFragment {
     grapheme: String,
     rendered_width: GraphemeWidth,
     replacement: Option<char>,
-    // TODO: Remove this once we start using this
-    #[allow(dead_code)]
     start_byte_index: usize,
 }
 
