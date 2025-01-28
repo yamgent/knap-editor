@@ -146,10 +146,11 @@ impl TextLine {
         search_cursor_x_pos: Option<u64>,
     ) -> Result<()> {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        enum SearchHighlightColor {
+        enum HighlightColor {
             None,
-            Match,
-            Cursor,
+            Number,
+            SearchMatch,
+            SearchCursor,
         }
 
         let search_highlights = match search_text {
@@ -172,12 +173,12 @@ impl TextLine {
 
                 if current_x < text_offset_x.start {
                     if next_x > text_offset_x.start {
-                        chars_to_render.push(("⋯".to_string(), 1, SearchHighlightColor::None));
+                        chars_to_render.push(("⋯".to_string(), 1, HighlightColor::None));
                     }
                 } else if next_x > text_offset_x.end {
-                    chars_to_render.push(("⋯".to_string(), 1, SearchHighlightColor::None));
+                    chars_to_render.push(("⋯".to_string(), 1, HighlightColor::None));
                 } else {
-                    let search_highlight_type = if search_highlights
+                    let highlight_type = if search_highlights
                         .iter()
                         .any(|range| range.contains(&current_fragment.start_byte_index))
                     {
@@ -185,12 +186,18 @@ impl TextLine {
                             && current_fragment_idx
                                 == search_cursor_x_pos.unwrap_or_default().to_usize_clamp()
                         {
-                            SearchHighlightColor::Cursor
+                            HighlightColor::SearchCursor
                         } else {
-                            SearchHighlightColor::Match
+                            HighlightColor::SearchMatch
                         }
+                    } else if current_fragment
+                        .grapheme
+                        .chars()
+                        .all(|ch| ch.is_ascii_digit())
+                    {
+                        HighlightColor::Number
                     } else {
-                        SearchHighlightColor::None
+                        HighlightColor::None
                     };
 
                     chars_to_render.push((
@@ -200,7 +207,7 @@ impl TextLine {
                                 replacement.to_string()
                             }),
                         current_fragment.rendered_width.width(),
-                        search_highlight_type,
+                        highlight_type,
                     ));
                 }
 
@@ -214,7 +221,7 @@ impl TextLine {
         if !chars_to_render.is_empty() {
             let grouped_strings = chars_to_render.into_iter().fold(
                 vec![],
-                |mut acc: Vec<(String, u64, SearchHighlightColor)>, current| {
+                |mut acc: Vec<(String, u64, HighlightColor)>, current| {
                     let mut insert_new = true;
 
                     if let Some(last_entry) = acc.last_mut() {
@@ -236,47 +243,34 @@ impl TextLine {
                 .into_iter()
                 .fold(
                     (0u64, Ok(())),
-                    |(x_offset, recent_result), (string, string_width, search_highlight)| {
+                    |(x_offset, recent_result), (string, string_width, highlight_type)| {
                         if recent_result.is_err() {
                             (0, recent_result)
                         } else {
                             let next_x_offset = x_offset.saturating_add(string_width);
-                            match search_highlight {
-                                SearchHighlightColor::None => (
-                                    next_x_offset,
-                                    terminal::draw_text(
-                                        TerminalPos {
-                                            x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                            y: screen_pos.y,
-                                        },
-                                        string,
-                                    ),
+                            let (foreground, background) = match highlight_type {
+                                HighlightColor::None => (None, None),
+                                HighlightColor::SearchMatch => {
+                                    (Some(Color::Black), Some(Color::Yellow))
+                                }
+                                HighlightColor::SearchCursor => {
+                                    (Some(Color::Black), Some(Color::Blue))
+                                }
+                                HighlightColor::Number => (Some(Color::DarkRed), None),
+                            };
+
+                            (
+                                next_x_offset,
+                                terminal::draw_colored_text(
+                                    TerminalPos {
+                                        x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
+                                        y: screen_pos.y,
+                                    },
+                                    string,
+                                    foreground,
+                                    background,
                                 ),
-                                SearchHighlightColor::Match => (
-                                    next_x_offset,
-                                    terminal::draw_colored_text(
-                                        TerminalPos {
-                                            x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                            y: screen_pos.y,
-                                        },
-                                        string,
-                                        Some(Color::Black),
-                                        Some(Color::Yellow),
-                                    ),
-                                ),
-                                SearchHighlightColor::Cursor => (
-                                    next_x_offset,
-                                    terminal::draw_colored_text(
-                                        TerminalPos {
-                                            x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                            y: screen_pos.y,
-                                        },
-                                        string,
-                                        Some(Color::Black),
-                                        Some(Color::Blue),
-                                    ),
-                                ),
-                            }
+                            )
                         }
                     },
                 )
