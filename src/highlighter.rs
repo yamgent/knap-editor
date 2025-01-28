@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ops::Range};
+use std::{cell::RefCell, collections::HashMap, ops::Range};
+
+use regex::Regex;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     buffer::{Buffer, FileType},
@@ -39,6 +42,11 @@ pub struct HighlightInfo {
     file_type: FileType,
 }
 
+thread_local! {
+    static NUMBER_REGEX: RefCell<Regex> =
+        RefCell::new(Regex::new(r"^\d+(_\d+)*(\.\d+)?(e\d+)?$").expect("valid regex expression"));
+}
+
 fn get_highlights_for_line<T: AsRef<str>>(
     line: T,
     file_type: FileType,
@@ -65,13 +73,12 @@ fn get_highlights_for_line<T: AsRef<str>>(
 
     if matches!(file_type, FileType::Rust) {
         line.as_ref()
-            .chars()
-            .enumerate()
-            .for_each(|(byte_idx, ch)| {
-                if ch.is_ascii_digit() {
+            .split_word_bound_indices()
+            .for_each(|(byte_idx, word)| {
+                if NUMBER_REGEX.with_borrow(|regex| regex.is_match(word)) {
                     highlights.push(Highlight {
                         highlight_type: HighlightType::Number,
-                        range: byte_idx..(byte_idx.saturating_add(1)),
+                        range: byte_idx..(byte_idx.saturating_add(word.len())),
                     });
                 }
             });
