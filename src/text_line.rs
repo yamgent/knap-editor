@@ -218,6 +218,8 @@ impl TextLine {
                                     (Some(Color::Black), Some(Color::Blue))
                                 }
                                 Some(HighlightType::Number) => (Some(Color::DarkRed), None),
+                                Some(HighlightType::BasicType) => (Some(Color::Green), None),
+                                Some(HighlightType::EnumLiteral) => (Some(Color::DarkBlue), None),
                             };
 
                             (
