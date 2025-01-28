@@ -53,12 +53,12 @@ impl View {
 
     pub fn replace_buffer(&mut self, buffer: Buffer) {
         self.buffer = buffer;
-        self.highlight_info
-            .regenerate_on_buffer_change(&self.buffer);
+        self.highlight_info.update_file_type(&self.buffer);
     }
 
     pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.buffer.change_filename(filename);
+        self.highlight_info.update_file_type(&self.buffer);
     }
 
     pub fn get_status(&self) -> ViewStatus {
@@ -66,6 +66,7 @@ impl View {
             filename: self.buffer.get_filename(),
             total_lines: self.buffer.get_total_lines(),
             is_dirty: self.buffer.get_is_dirty(),
+            file_type: self.buffer.file_type(),
             caret_position: self.caret_pos,
         }
     }

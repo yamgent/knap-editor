@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Range};
 
 use crate::{
-    buffer::Buffer,
+    buffer::{Buffer, FileType},
     math::{ToUsizeClamp, Vec2u},
 };
 
@@ -36,10 +36,12 @@ impl Highlights {
 
 pub struct HighlightInfo {
     line_info: HashMap<usize, Highlights>,
+    file_type: FileType,
 }
 
 fn get_highlights_for_line<T: AsRef<str>>(
     line: T,
+    file_type: FileType,
     search_text: Option<&String>,
     search_cursor_x_pos: Option<u64>,
 ) -> Highlights {
@@ -61,17 +63,19 @@ fn get_highlights_for_line<T: AsRef<str>>(
         None => vec![],
     };
 
-    line.as_ref()
-        .chars()
-        .enumerate()
-        .for_each(|(byte_idx, ch)| {
-            if ch.is_ascii_digit() {
-                highlights.push(Highlight {
-                    highlight_type: HighlightType::Number,
-                    range: byte_idx..(byte_idx.saturating_add(1)),
-                });
-            }
-        });
+    if matches!(file_type, FileType::Rust) {
+        line.as_ref()
+            .chars()
+            .enumerate()
+            .for_each(|(byte_idx, ch)| {
+                if ch.is_ascii_digit() {
+                    highlights.push(Highlight {
+                        highlight_type: HighlightType::Number,
+                        range: byte_idx..(byte_idx.saturating_add(1)),
+                    });
+                }
+            });
+    }
 
     Highlights { highlights }
 }
@@ -80,7 +84,13 @@ impl HighlightInfo {
     pub fn new() -> Self {
         Self {
             line_info: HashMap::new(),
+            file_type: FileType::PlainText,
         }
+    }
+
+    pub fn update_file_type(&mut self, buffer: &Buffer) {
+        self.file_type = buffer.file_type();
+        self.regenerate_on_buffer_change(buffer);
     }
 
     pub fn regenerate_on_search_change<T: AsRef<str>>(
@@ -102,6 +112,7 @@ impl HighlightInfo {
                     line_idx,
                     get_highlights_for_line(
                         line,
+                        self.file_type,
                         Some(&search_text.as_ref().to_string()),
                         search_cursor_x_pos,
                     ),
@@ -116,9 +127,11 @@ impl HighlightInfo {
             .map(|line| {
                 get_highlights_for_line(
                     line,
+                    self.file_type,
                     // buffer change should not happen during search for our current
                     // implementation, so safe to pass in None for now
-                    None, None,
+                    None,
+                    None,
                 )
             })
             .enumerate()

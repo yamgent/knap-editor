@@ -10,10 +10,25 @@ use crate::{
     text_line::{InsertCharError, InsertCharResult, TextLine},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileType {
+    Rust,
+    PlainText,
+}
+
+fn deduce_filetype<T: AsRef<str>>(filename: T) -> FileType {
+    if filename.as_ref().to_lowercase().ends_with(".rs") {
+        FileType::Rust
+    } else {
+        FileType::PlainText
+    }
+}
+
 pub struct Buffer {
     content: Vec<TextLine>,
     filename: Option<String>,
     is_dirty: bool,
+    file_type: FileType,
 }
 
 impl Buffer {
@@ -22,6 +37,7 @@ impl Buffer {
             content: vec![],
             filename: None,
             is_dirty: false,
+            file_type: FileType::PlainText,
         }
     }
 
@@ -32,6 +48,7 @@ impl Buffer {
             content: content.lines().map(TextLine::new).collect(),
             filename: Some(filename.as_ref().to_string()),
             is_dirty: false,
+            file_type: deduce_filetype(filename),
         })
     }
 
@@ -41,6 +58,7 @@ impl Buffer {
 
     pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.filename = Some(filename.as_ref().to_string());
+        self.file_type = deduce_filetype(filename);
     }
 
     pub fn write_to_disk(&mut self) -> Result<()> {
@@ -63,6 +81,10 @@ impl Buffer {
 
     pub fn get_is_dirty(&self) -> bool {
         self.is_dirty
+    }
+
+    pub fn file_type(&self) -> FileType {
+        self.file_type
     }
 
     pub fn get_line_len(&self, line_idx: usize) -> usize {
