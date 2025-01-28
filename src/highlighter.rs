@@ -23,6 +23,7 @@ pub enum HighlightType {
     /// sort of... the tutorial doesn't specify how to verify that
     /// it is actually a legal Rust character
     Character,
+    LifetimeSpecifier,
 }
 
 pub struct Highlight {
@@ -143,6 +144,27 @@ fn get_highlights_for_line<T: AsRef<str>>(
                         }
                     }
                 });
+        }
+
+        {
+            // highlight lifetime specifier
+            let mut iter = line.as_ref().split_word_bound_indices().peekable();
+
+            while let Some((current_idx, current)) = iter.next() {
+                if current == "'" {
+                    if let Some((next_idx, next)) = iter.peek() {
+                        if next
+                            .chars()
+                            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+                        {
+                            highlights.push(Highlight {
+                                highlight_type: HighlightType::LifetimeSpecifier,
+                                range: current_idx..(next_idx.saturating_add(next.len())),
+                            })
+                        }
+                    }
+                }
+            }
         }
 
         line.as_ref()

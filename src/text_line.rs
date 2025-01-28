@@ -222,6 +222,9 @@ impl TextLine {
                                 Some(HighlightType::BasicType) => (Some(Color::Green), None),
                                 Some(HighlightType::EnumLiteral) => (Some(Color::DarkBlue), None),
                                 Some(HighlightType::Character) => (Some(Color::DarkYellow), None),
+                                Some(HighlightType::LifetimeSpecifier) => {
+                                    (Some(Color::DarkYellow), None)
+                                }
                             };
 
                             (
