@@ -169,7 +169,7 @@ fn get_highlights_for_line<T: AsRef<str>>(
                             highlights.push(Highlight {
                                 highlight_type: HighlightType::LifetimeSpecifier,
                                 range: current_idx..(next_idx.saturating_add(next.len())),
-                            })
+                            });
                         }
                     }
                 }
