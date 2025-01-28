@@ -1,6 +1,7 @@
 use anyhow::Result;
 
 use crate::{
+    buffer::FileType,
     math::{Bounds2u, ToU16Clamp, ToUsizeClamp, Vec2u},
     terminal::{self, TerminalPos},
 };
@@ -10,6 +11,7 @@ pub struct ViewStatus {
     pub total_lines: usize,
     pub is_dirty: bool,
     pub caret_position: Vec2u,
+    pub file_type: FileType,
 }
 
 pub struct StatusBar {
@@ -41,7 +43,11 @@ impl StatusBar {
             );
 
             let right = format!(
-                "{}:{}",
+                "{} | {}:{}",
+                match view_status.file_type {
+                    FileType::Rust => "Rust",
+                    FileType::PlainText => "Plain Text",
+                },
                 view_status.caret_position.y.saturating_add(1),
                 view_status.caret_position.x.saturating_add(1),
             );

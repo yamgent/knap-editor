@@ -3,16 +3,32 @@ use std::{fs::File, io::Write, ops::Range};
 use anyhow::Result;
 
 use crate::{
+    highlighter::Highlights,
     math::{ToU64, ToUsizeClamp, Vec2u},
     search::SearchDirection,
     terminal::{self, TerminalPos},
     text_line::{InsertCharError, InsertCharResult, TextLine},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileType {
+    Rust,
+    PlainText,
+}
+
+fn deduce_filetype<T: AsRef<str>>(filename: T) -> FileType {
+    if filename.as_ref().to_lowercase().ends_with(".rs") {
+        FileType::Rust
+    } else {
+        FileType::PlainText
+    }
+}
+
 pub struct Buffer {
     content: Vec<TextLine>,
     filename: Option<String>,
     is_dirty: bool,
+    file_type: FileType,
 }
 
 impl Buffer {
@@ -21,6 +37,7 @@ impl Buffer {
             content: vec![],
             filename: None,
             is_dirty: false,
+            file_type: FileType::PlainText,
         }
     }
 
@@ -31,6 +48,7 @@ impl Buffer {
             content: content.lines().map(TextLine::new).collect(),
             filename: Some(filename.as_ref().to_string()),
             is_dirty: false,
+            file_type: deduce_filetype(filename),
         })
     }
 
@@ -40,6 +58,7 @@ impl Buffer {
 
     pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.filename = Some(filename.as_ref().to_string());
+        self.file_type = deduce_filetype(filename);
     }
 
     pub fn write_to_disk(&mut self) -> Result<()> {
@@ -64,6 +83,10 @@ impl Buffer {
         self.is_dirty
     }
 
+    pub fn file_type(&self) -> FileType {
+        self.file_type
+    }
+
     pub fn get_line_len(&self, line_idx: usize) -> usize {
         self.content.get(line_idx).map_or(0, TextLine::get_line_len)
     }
@@ -78,18 +101,19 @@ impl Buffer {
         self.content.len()
     }
 
+    pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
+        self.content.get(line_idx).map(ToString::to_string)
+    }
+
     pub fn render_line(
         &self,
         line_idx: usize,
         screen_pos: TerminalPos,
         text_offset_x: Range<u64>,
-        search_text: Option<&String>,
-        search_cursor_pos: Option<u64>,
+        line_highlight: &Highlights,
     ) -> Result<()> {
         match self.content.get(line_idx) {
-            Some(line) => {
-                line.render_line(screen_pos, text_offset_x, search_text, search_cursor_pos)
-            }
+            Some(line) => line.render_line(screen_pos, text_offset_x, line_highlight),
             None => terminal::draw_text(screen_pos, "~"),
         }
     }

@@ -6,7 +6,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
-    math::{ToU16Clamp, ToUsizeClamp},
+    highlighter::{HighlightType, Highlights},
+    math::ToU16Clamp,
     search::SearchDirection,
     terminal::{self, TerminalPos},
 };
@@ -142,57 +143,24 @@ impl TextLine {
         &self,
         screen_pos: TerminalPos,
         text_offset_x: Range<u64>,
-        search_text: Option<&String>,
-        search_cursor_x_pos: Option<u64>,
+        highlights: &Highlights,
     ) -> Result<()> {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        enum SearchHighlightColor {
-            None,
-            Match,
-            Cursor,
-        }
-
-        let search_highlights = match search_text {
-            Some(search_text) => self
-                .string
-                .match_indices(search_text)
-                .map(|entries| entries.0..(entries.0.saturating_add(search_text.len())))
-                .collect::<Vec<_>>(),
-            None => vec![],
-        };
-
         let mut current_x = 0;
-        let mut fragment_iter = self.fragments.iter().enumerate();
+        let mut fragment_iter = self.fragments.iter();
 
         let mut chars_to_render = vec![];
 
         while current_x < text_offset_x.end {
-            if let Some((current_fragment_idx, current_fragment)) = fragment_iter.next() {
+            if let Some(current_fragment) = fragment_iter.next() {
                 let next_x = current_x.saturating_add(current_fragment.rendered_width.width());
 
                 if current_x < text_offset_x.start {
                     if next_x > text_offset_x.start {
-                        chars_to_render.push(("⋯".to_string(), 1, SearchHighlightColor::None));
+                        chars_to_render.push(("⋯".to_string(), 1, None));
                     }
                 } else if next_x > text_offset_x.end {
-                    chars_to_render.push(("⋯".to_string(), 1, SearchHighlightColor::None));
+                    chars_to_render.push(("⋯".to_string(), 1, None));
                 } else {
-                    let search_highlight_type = if search_highlights
-                        .iter()
-                        .any(|range| range.contains(&current_fragment.start_byte_index))
-                    {
-                        if search_cursor_x_pos.is_some()
-                            && current_fragment_idx
-                                == search_cursor_x_pos.unwrap_or_default().to_usize_clamp()
-                        {
-                            SearchHighlightColor::Cursor
-                        } else {
-                            SearchHighlightColor::Match
-                        }
-                    } else {
-                        SearchHighlightColor::None
-                    };
-
                     chars_to_render.push((
                         current_fragment
                             .replacement
@@ -200,7 +168,7 @@ impl TextLine {
                                 replacement.to_string()
                             }),
                         current_fragment.rendered_width.width(),
-                        search_highlight_type,
+                        highlights.get_highlight_at(current_fragment.start_byte_index),
                     ));
                 }
 
@@ -214,7 +182,7 @@ impl TextLine {
         if !chars_to_render.is_empty() {
             let grouped_strings = chars_to_render.into_iter().fold(
                 vec![],
-                |mut acc: Vec<(String, u64, SearchHighlightColor)>, current| {
+                |mut acc: Vec<(String, u64, Option<HighlightType>)>, current| {
                     let mut insert_new = true;
 
                     if let Some(last_entry) = acc.last_mut() {
@@ -236,47 +204,42 @@ impl TextLine {
                 .into_iter()
                 .fold(
                     (0u64, Ok(())),
-                    |(x_offset, recent_result), (string, string_width, search_highlight)| {
+                    |(x_offset, recent_result), (string, string_width, highlight_type)| {
                         if recent_result.is_err() {
                             (0, recent_result)
                         } else {
                             let next_x_offset = x_offset.saturating_add(string_width);
-                            match search_highlight {
-                                SearchHighlightColor::None => (
-                                    next_x_offset,
-                                    terminal::draw_text(
-                                        TerminalPos {
-                                            x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                            y: screen_pos.y,
-                                        },
-                                        string,
-                                    ),
+                            let (foreground, background) = match highlight_type {
+                                None => (None, None),
+                                Some(HighlightType::SearchMatch) => {
+                                    (Some(Color::Black), Some(Color::Yellow))
+                                }
+                                Some(HighlightType::SearchCursor) => {
+                                    (Some(Color::Black), Some(Color::Blue))
+                                }
+                                Some(HighlightType::Number) => (Some(Color::DarkRed), None),
+                                Some(HighlightType::Keyword) => (Some(Color::Blue), None),
+                                Some(HighlightType::BasicType) => (Some(Color::Green), None),
+                                Some(HighlightType::EnumLiteral) => (Some(Color::DarkBlue), None),
+                                Some(HighlightType::Character) => (Some(Color::DarkYellow), None),
+                                Some(HighlightType::LifetimeSpecifier) => {
+                                    (Some(Color::DarkYellow), None)
+                                }
+                                Some(HighlightType::Comment) => (Some(Color::DarkGreen), None),
+                            };
+
+                            (
+                                next_x_offset,
+                                terminal::draw_colored_text(
+                                    TerminalPos {
+                                        x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
+                                        y: screen_pos.y,
+                                    },
+                                    string,
+                                    foreground,
+                                    background,
                                 ),
-                                SearchHighlightColor::Match => (
-                                    next_x_offset,
-                                    terminal::draw_colored_text(
-                                        TerminalPos {
-                                            x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                            y: screen_pos.y,
-                                        },
-                                        string,
-                                        Some(Color::Black),
-                                        Some(Color::Yellow),
-                                    ),
-                                ),
-                                SearchHighlightColor::Cursor => (
-                                    next_x_offset,
-                                    terminal::draw_colored_text(
-                                        TerminalPos {
-                                            x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                            y: screen_pos.y,
-                                        },
-                                        string,
-                                        Some(Color::Black),
-                                        Some(Color::Blue),
-                                    ),
-                                ),
-                            }
+                            )
                         }
                     },
                 )
