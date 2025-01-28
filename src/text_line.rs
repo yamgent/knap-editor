@@ -225,6 +225,7 @@ impl TextLine {
                                 Some(HighlightType::LifetimeSpecifier) => {
                                     (Some(Color::DarkYellow), None)
                                 }
+                                Some(HighlightType::Comment) => (Some(Color::DarkGreen), None),
                             };
 
                             (

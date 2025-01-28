@@ -24,6 +24,7 @@ pub enum HighlightType {
     /// it is actually a legal Rust character
     Character,
     LifetimeSpecifier,
+    Comment,
 }
 
 pub struct Highlight {
@@ -113,6 +114,14 @@ fn get_highlights_for_line<T: AsRef<str>>(
     };
 
     if matches!(file_type, FileType::Rust) {
+        // highlight single line comments
+        if let Some(single_line_comment_start) = line.as_ref().find("//") {
+            highlights.push(Highlight {
+                highlight_type: HighlightType::Comment,
+                range: single_line_comment_start..(line.as_ref().len()),
+            });
+        }
+
         {
             let mut last_seen_quote = None;
             let mut escaped = false;
