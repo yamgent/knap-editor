@@ -20,6 +20,9 @@ pub enum HighlightType {
     Keyword,
     BasicType,
     EnumLiteral,
+    /// sort of... the tutorial doesn't specify how to verify that
+    /// it is actually a legal Rust character
+    Character,
 }
 
 pub struct Highlight {
@@ -109,6 +112,39 @@ fn get_highlights_for_line<T: AsRef<str>>(
     };
 
     if matches!(file_type, FileType::Rust) {
+        {
+            let mut last_seen_quote = None;
+            let mut escaped = false;
+
+            // highlight characters
+            line.as_ref()
+                .split_word_bound_indices()
+                .for_each(|(current_idx, current)| match last_seen_quote {
+                    None => {
+                        if current == "'" {
+                            last_seen_quote = Some(current_idx);
+                        }
+                    }
+                    Some(last_seen_idx) => {
+                        if current == "\\" {
+                            escaped = true;
+                        } else {
+                            if current == "'" && !escaped {
+                                highlights.push(Highlight {
+                                    highlight_type: HighlightType::Character,
+                                    range: last_seen_idx
+                                        ..(current_idx.saturating_add(current.len())),
+                                });
+                                last_seen_quote = None;
+                            } else if current == " " {
+                                last_seen_quote = None;
+                            }
+                            escaped = false;
+                        }
+                    }
+                });
+        }
+
         line.as_ref()
             .split_word_bound_indices()
             .for_each(|(byte_idx, word)| {
