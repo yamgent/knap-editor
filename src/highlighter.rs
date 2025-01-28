@@ -17,6 +17,7 @@ pub enum HighlightType {
     Number,
     SearchMatch,
     SearchCursor,
+    Keyword,
     BasicType,
     EnumLiteral,
 }
@@ -61,6 +62,14 @@ thread_local! {
     static HEXADECIMAL_REGEX: RefCell<Regex> =
         RefCell::new(Regex::new(r"^0[xX][\dabcdefABCDEF]+$").expect("valid regex expression"));
 
+    static KEYWORD_TYPES: RefCell<HashSet<String>> = RefCell::new([
+        "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn",
+        "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref",
+        "return", "self", "Self", "static", "struct", "super", "trait", "type", "unsafe", "use",
+        "where", "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final",
+        "macro", "override", "priv", "typeof", "unsized", "virtual", "yield", "try"
+    ].iter().map(|s| (*s).to_string()).collect());
+
     static BASIC_TYPES: RefCell<HashSet<String>> = RefCell::new([
         "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize",
         "f32", "f64",
@@ -104,7 +113,9 @@ fn get_highlights_for_line<T: AsRef<str>>(
             .split_word_bound_indices()
             .for_each(|(byte_idx, word)| {
                 let range = byte_idx..(byte_idx.saturating_add(word.len()));
-                let highlight_type = if BASIC_TYPES.with_borrow(|set| set.contains(word)) {
+                let highlight_type = if KEYWORD_TYPES.with_borrow(|set| set.contains(word)) {
+                    Some(HighlightType::Keyword)
+                } else if BASIC_TYPES.with_borrow(|set| set.contains(word)) {
                     Some(HighlightType::BasicType)
                 } else if ENUM_LITERALS.with_borrow(|set| set.contains(word)) {
                     Some(HighlightType::EnumLiteral)
