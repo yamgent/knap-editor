@@ -3,6 +3,7 @@ use std::{fs::File, io::Write, ops::Range};
 use anyhow::Result;
 
 use crate::{
+    highlighter::Highlights,
     math::{ToU64, ToUsizeClamp, Vec2u},
     search::SearchDirection,
     terminal::{self, TerminalPos},
@@ -78,18 +79,19 @@ impl Buffer {
         self.content.len()
     }
 
+    pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
+        self.content.get(line_idx).map(ToString::to_string)
+    }
+
     pub fn render_line(
         &self,
         line_idx: usize,
         screen_pos: TerminalPos,
         text_offset_x: Range<u64>,
-        search_text: Option<&String>,
-        search_cursor_pos: Option<u64>,
+        line_highlight: &Highlights,
     ) -> Result<()> {
         match self.content.get(line_idx) {
-            Some(line) => {
-                line.render_line(screen_pos, text_offset_x, search_text, search_cursor_pos)
-            }
+            Some(line) => line.render_line(screen_pos, text_offset_x, line_highlight),
             None => terminal::draw_text(screen_pos, "~"),
         }
     }

@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::{
     commands::EditorCommand,
+    highlighter::Highlights,
     math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
     search::SearchDirection,
@@ -72,14 +73,6 @@ impl CommandBar {
         self.prompt = prompt;
     }
 
-    pub fn search_text(&self) -> Option<String> {
-        if matches!(self.prompt, CommandBarPrompt::Search) {
-            Some(self.input.to_string())
-        } else {
-            None
-        }
-    }
-
     pub fn has_active_prompt(&self) -> bool {
         !matches!(self.prompt, CommandBarPrompt::None)
     }
@@ -122,8 +115,7 @@ impl CommandBar {
                     y: self.bounds.pos.y.to_u16_clamp(),
                 },
                 self.scroll_offset.x..(self.scroll_offset.x.saturating_add(input_bounds.size.x)),
-                None,
-                None,
+                &Highlights::new(),
             )?;
 
             let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);

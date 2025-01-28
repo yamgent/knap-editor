@@ -6,7 +6,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
-    math::{ToU16Clamp, ToUsizeClamp},
+    highlighter::{HighlightType, Highlights},
+    math::ToU16Clamp,
     search::SearchDirection,
     terminal::{self, TerminalPos},
 };
@@ -142,64 +143,24 @@ impl TextLine {
         &self,
         screen_pos: TerminalPos,
         text_offset_x: Range<u64>,
-        search_text: Option<&String>,
-        search_cursor_x_pos: Option<u64>,
+        highlights: &Highlights,
     ) -> Result<()> {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        enum HighlightColor {
-            None,
-            Number,
-            SearchMatch,
-            SearchCursor,
-        }
-
-        let search_highlights = match search_text {
-            Some(search_text) => self
-                .string
-                .match_indices(search_text)
-                .map(|entries| entries.0..(entries.0.saturating_add(search_text.len())))
-                .collect::<Vec<_>>(),
-            None => vec![],
-        };
-
         let mut current_x = 0;
-        let mut fragment_iter = self.fragments.iter().enumerate();
+        let mut fragment_iter = self.fragments.iter();
 
         let mut chars_to_render = vec![];
 
         while current_x < text_offset_x.end {
-            if let Some((current_fragment_idx, current_fragment)) = fragment_iter.next() {
+            if let Some(current_fragment) = fragment_iter.next() {
                 let next_x = current_x.saturating_add(current_fragment.rendered_width.width());
 
                 if current_x < text_offset_x.start {
                     if next_x > text_offset_x.start {
-                        chars_to_render.push(("⋯".to_string(), 1, HighlightColor::None));
+                        chars_to_render.push(("⋯".to_string(), 1, None));
                     }
                 } else if next_x > text_offset_x.end {
-                    chars_to_render.push(("⋯".to_string(), 1, HighlightColor::None));
+                    chars_to_render.push(("⋯".to_string(), 1, None));
                 } else {
-                    let highlight_type = if search_highlights
-                        .iter()
-                        .any(|range| range.contains(&current_fragment.start_byte_index))
-                    {
-                        if search_cursor_x_pos.is_some()
-                            && current_fragment_idx
-                                == search_cursor_x_pos.unwrap_or_default().to_usize_clamp()
-                        {
-                            HighlightColor::SearchCursor
-                        } else {
-                            HighlightColor::SearchMatch
-                        }
-                    } else if current_fragment
-                        .grapheme
-                        .chars()
-                        .all(|ch| ch.is_ascii_digit())
-                    {
-                        HighlightColor::Number
-                    } else {
-                        HighlightColor::None
-                    };
-
                     chars_to_render.push((
                         current_fragment
                             .replacement
@@ -207,7 +168,7 @@ impl TextLine {
                                 replacement.to_string()
                             }),
                         current_fragment.rendered_width.width(),
-                        highlight_type,
+                        highlights.get_highlight_at(current_fragment.start_byte_index),
                     ));
                 }
 
@@ -221,7 +182,7 @@ impl TextLine {
         if !chars_to_render.is_empty() {
             let grouped_strings = chars_to_render.into_iter().fold(
                 vec![],
-                |mut acc: Vec<(String, u64, HighlightColor)>, current| {
+                |mut acc: Vec<(String, u64, Option<HighlightType>)>, current| {
                     let mut insert_new = true;
 
                     if let Some(last_entry) = acc.last_mut() {
@@ -249,14 +210,14 @@ impl TextLine {
                         } else {
                             let next_x_offset = x_offset.saturating_add(string_width);
                             let (foreground, background) = match highlight_type {
-                                HighlightColor::None => (None, None),
-                                HighlightColor::SearchMatch => {
+                                None => (None, None),
+                                Some(HighlightType::SearchMatch) => {
                                     (Some(Color::Black), Some(Color::Yellow))
                                 }
-                                HighlightColor::SearchCursor => {
+                                Some(HighlightType::SearchCursor) => {
                                     (Some(Color::Black), Some(Color::Blue))
                                 }
-                                HighlightColor::Number => (Some(Color::DarkRed), None),
+                                Some(HighlightType::Number) => (Some(Color::DarkRed), None),
                             };
 
                             (
