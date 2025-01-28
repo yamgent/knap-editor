@@ -45,6 +45,15 @@ pub struct HighlightInfo {
 thread_local! {
     static NUMBER_REGEX: RefCell<Regex> =
         RefCell::new(Regex::new(r"^\d+(_\d+)*(\.\d+)?(e\d+)?$").expect("valid regex expression"));
+
+    static BINARY_REGEX: RefCell<Regex> =
+        RefCell::new(Regex::new(r"^0[bB][01]+$").expect("valid regex expression"));
+
+    static OCTAL_REGEX: RefCell<Regex> =
+        RefCell::new(Regex::new(r"^0[oO][01234567]+$").expect("valid regex expression"));
+
+    static HEXADECIMAL_REGEX: RefCell<Regex> =
+        RefCell::new(Regex::new(r"^0[xX][\dabcdefABCDEF]+$").expect("valid regex expression"));
 }
 
 fn get_highlights_for_line<T: AsRef<str>>(
@@ -75,7 +84,11 @@ fn get_highlights_for_line<T: AsRef<str>>(
         line.as_ref()
             .split_word_bound_indices()
             .for_each(|(byte_idx, word)| {
-                if NUMBER_REGEX.with_borrow(|regex| regex.is_match(word)) {
+                if NUMBER_REGEX.with_borrow(|regex| regex.is_match(word))
+                    || BINARY_REGEX.with_borrow(|regex| regex.is_match(word))
+                    || OCTAL_REGEX.with_borrow(|regex| regex.is_match(word))
+                    || HEXADECIMAL_REGEX.with_borrow(|regex| regex.is_match(word))
+                {
                     highlights.push(Highlight {
                         highlight_type: HighlightType::Number,
                         range: byte_idx..(byte_idx.saturating_add(word.len())),
