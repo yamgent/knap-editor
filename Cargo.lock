@@ -71,8 +71,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "hecto"
-version = "0.1.0"
+name = "knap_editor"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossterm",
