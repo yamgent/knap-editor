@@ -19,9 +19,10 @@ mod status_bar;
 mod terminal;
 mod text_line;
 mod view;
+mod window;
 
-use editor::Editor;
+use window::EditorWindow;
 
 fn main() {
-    Editor::new().run();
+    EditorWindow::new().run();
 }
