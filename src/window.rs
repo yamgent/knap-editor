@@ -1,17 +1,21 @@
 use std::{num::NonZeroUsize, sync::Arc};
 
 use vello::{
+    peniko::color::AlphaColor,
     util::{RenderContext, RenderSurface},
-    wgpu::PresentMode,
-    Renderer, RendererOptions, Scene,
+    wgpu::{Maintain, PresentMode},
+    AaConfig, RenderParams, Renderer, RendererOptions, Scene,
 };
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::ModifiersState,
     window::{Window, WindowId},
 };
+
+use crate::{editor::Editor, math::Vec2u};
 
 pub struct EditorWindow {
     handler: Option<WindowHandler>,
@@ -59,6 +63,10 @@ struct WindowHandler {
     window: Arc<Window>,
     state: WindowState,
 
+    modifiers: ModifiersState,
+
+    editor: Editor,
+
     // to avoid having to re-allocate every frame, create a single copy of Scene
     // and re-use it every frame
     scene: Scene,
@@ -66,11 +74,19 @@ struct WindowHandler {
 
 impl WindowHandler {
     fn init(event_loop: &ActiveEventLoop) -> Self {
+        let window_size = Vec2u { x: 1024, y: 768 };
+
+        let mut editor = Editor::new(window_size);
+        // TODO: Any better place to put this?
+        editor.open_arg_file();
+
         Self {
             context: RenderContext::new(),
             renderers: vec![],
-            window: create_winit_window(event_loop),
+            window: create_winit_window(event_loop, window_size),
             state: WindowState::Suspended,
+            modifiers: ModifiersState::default(),
+            editor,
             scene: Scene::new(),
         }
     }
@@ -102,7 +118,76 @@ impl WindowHandler {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        // TODO: Implement
+        if window_id != self.window.id() {
+            // not our window's event, ignore
+            return;
+        }
+
+        let WindowState::Active(active_state) = &mut self.state else {
+            // not active, ignore
+            return;
+        };
+
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            }
+            WindowEvent::Resized(size) => {
+                self.context.resize_surface(
+                    active_state.surface.surface_mut(),
+                    size.width,
+                    size.height,
+                );
+                self.editor.resize(size.into());
+            }
+            WindowEvent::ModifiersChanged(state) => {
+                self.modifiers = state.state();
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.editor
+                    .handle_key_event(&event, &self.modifiers, &event_loop);
+            }
+            WindowEvent::RedrawRequested => {
+                // re-use the same scene so that we do not have to re-allocate memory
+                // per frame
+                self.scene.reset();
+
+                self.editor.render(&mut self.scene);
+
+                let surface = active_state.surface.surface();
+                let width = surface.config.width;
+                let height = surface.config.height;
+
+                let device_handle = &self.context.devices[surface.dev_id];
+
+                let surface_texture = surface
+                    .surface
+                    .get_current_texture()
+                    .expect("able to get surface texture");
+
+                self.renderers[surface.dev_id]
+                    .as_mut()
+                    .expect("inited during resume")
+                    .render_to_surface(
+                        &device_handle.device,
+                        &device_handle.queue,
+                        &self.scene,
+                        &surface_texture,
+                        &RenderParams {
+                            base_color: AlphaColor::BLACK,
+                            width,
+                            height,
+                            antialiasing_method: AaConfig::Msaa16,
+                        },
+                    )
+                    .expect("able to render");
+
+                surface_texture.present();
+
+                device_handle.device.poll(Maintain::Poll);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -139,14 +224,18 @@ impl StaticRenderSurface {
     fn surface(&self) -> &RenderSurface<'static> {
         &self.surface
     }
+
+    fn surface_mut(&mut self) -> &mut RenderSurface<'static> {
+        &mut self.surface
+    }
 }
 
-fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
+fn create_winit_window(event_loop: &ActiveEventLoop, window_size: Vec2u) -> Arc<Window> {
     Arc::new(
         event_loop
             .create_window(
                 Window::default_attributes()
-                    .with_inner_size(LogicalSize::new(1024, 768))
+                    .with_inner_size(LogicalSize::<u32>::from(window_size))
                     .with_resizable(true)
                     .with_title("knap_editor"),
             )
