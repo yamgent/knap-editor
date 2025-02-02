@@ -10,6 +10,7 @@
 mod buffer;
 mod command_bar;
 mod commands;
+mod drawer;
 mod editor;
 mod highlighter;
 mod math;

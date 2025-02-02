@@ -1,4 +1,3 @@
-use vello::Scene;
 use winit::{
     event::{ElementState, KeyEvent},
     event_loop::ActiveEventLoop,
@@ -9,6 +8,7 @@ use crate::{
     buffer::Buffer,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
+    drawer::Drawer,
     math::{Bounds2u, Vec2u},
     message_bar::MessageBar,
     status_bar::StatusBar,
@@ -28,7 +28,7 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(window_size: Vec2u) -> Self {
-        // TODO: Actual font size
+        // TODO: Refactor font size
         const FONT_SIZE: u64 = 16;
 
         let view = View::new(Bounds2u {
@@ -194,7 +194,7 @@ impl Editor {
     }
 
     pub fn resize(&mut self, new_size: Vec2u) {
-        // TODO: Actual font size
+        // TODO: Refactor font size
         const FONT_SIZE: u64 = 16;
 
         self.view.set_bounds(Bounds2u {
@@ -236,19 +236,17 @@ impl Editor {
         });
     }
 
-    pub fn render(&self, scene: &mut Scene) {
+    pub fn render(&self, drawer: &mut Drawer) {
         // TODO: Restore implementation
-        let _ = scene;
         // TODO: Handle cursor pos
-        /*
-        self.view.render()?;
-        self.status_bar.render(self.view.get_status())?;
 
-        if self.command_bar.has_active_prompt() {
-            self.command_bar.render()?;
-        } else {
-            self.message_bar.render()?;
-        }
-        */
+        //self.view.render()?;
+        self.status_bar.render(drawer, self.view.get_status());
+        //
+        //if self.command_bar.has_active_prompt() {
+        //    self.command_bar.render()?;
+        //} else {
+        self.message_bar.render(drawer);
+        //}
     }
 }

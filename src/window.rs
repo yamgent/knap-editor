@@ -4,7 +4,7 @@ use vello::{
     peniko::color::AlphaColor,
     util::{RenderContext, RenderSurface},
     wgpu::{Maintain, PresentMode},
-    AaConfig, RenderParams, Renderer, RendererOptions, Scene,
+    AaConfig, RenderParams, Renderer, RendererOptions,
 };
 use winit::{
     application::ApplicationHandler,
@@ -15,7 +15,7 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::{editor::Editor, math::Vec2u};
+use crate::{drawer::Drawer, editor::Editor, math::Vec2u};
 
 pub struct EditorWindow {
     handler: Option<WindowHandler>,
@@ -62,14 +62,11 @@ struct WindowHandler {
     renderers: Vec<Option<Renderer>>,
     window: Arc<Window>,
     state: WindowState,
+    drawer: Drawer,
 
     modifiers: ModifiersState,
 
     editor: Editor,
-
-    // to avoid having to re-allocate every frame, create a single copy of Scene
-    // and re-use it every frame
-    scene: Scene,
 }
 
 impl WindowHandler {
@@ -85,9 +82,9 @@ impl WindowHandler {
             renderers: vec![],
             window: create_winit_window(event_loop, window_size),
             state: WindowState::Suspended,
+            drawer: Drawer::init(),
             modifiers: ModifiersState::default(),
             editor,
-            scene: Scene::new(),
         }
     }
 
@@ -146,13 +143,12 @@ impl WindowHandler {
             WindowEvent::KeyboardInput { event, .. } => {
                 self.editor
                     .handle_key_event(&event, &self.modifiers, &event_loop);
+                self.window.request_redraw();
             }
             WindowEvent::RedrawRequested => {
-                // re-use the same scene so that we do not have to re-allocate memory
-                // per frame
-                self.scene.reset();
+                self.drawer.reset();
 
-                self.editor.render(&mut self.scene);
+                self.editor.render(&mut self.drawer);
 
                 let surface = active_state.surface.surface();
                 let width = surface.config.width;
@@ -171,7 +167,7 @@ impl WindowHandler {
                     .render_to_surface(
                         &device_handle.device,
                         &device_handle.queue,
-                        &self.scene,
+                        &self.drawer.scene_ref(),
                         &surface_texture,
                         &RenderParams {
                             base_color: AlphaColor::BLACK,

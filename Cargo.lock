@@ -730,9 +730,11 @@ name = "knap_editor"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bytemuck",
  "crossterm",
  "pollster",
  "regex",
+ "skrifa",
  "unicode-segmentation",
  "unicode-width 0.2.0",
  "vello",

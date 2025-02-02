@@ -1,9 +1,12 @@
-use anyhow::Result;
+use vello::{
+    kurbo::{Affine, Vec2},
+    peniko::{color::AlphaColor, Brush},
+};
 
 use crate::{
     buffer::FileType,
-    math::{Bounds2u, ToU16Clamp, ToUsizeClamp, Vec2u},
-    terminal::{self, TerminalPos},
+    drawer::Drawer,
+    math::{Bounds2u, Vec2u},
 };
 
 pub struct ViewStatus {
@@ -27,10 +30,8 @@ impl StatusBar {
         self.bounds = bounds;
     }
 
-    pub fn render(&self, view_status: ViewStatus) -> Result<()> {
+    pub fn render(&self, drawer: &mut Drawer, view_status: ViewStatus) {
         if self.bounds.size.saturating_area() > 0 {
-            let size_x = self.bounds.size.x.to_usize_clamp();
-
             let left = format!(
                 "{} - {} lines {}",
                 view_status.filename.unwrap_or("[No Name]".to_string()),
@@ -52,29 +53,36 @@ impl StatusBar {
                 view_status.caret_position.x.saturating_add(1),
             );
 
-            let final_content = if left.len() > size_x {
-                format!("{left:.size_x$}")
-            } else if left.len().saturating_add(right.len()) > size_x {
-                format!("{left:<size_x$}")
-            } else {
-                let right_space = size_x.saturating_sub(left.len());
-                format!("{left}{right:>right_space$}")
-            };
+            // TODO: Refactor font size
+            // TODO: Also refactor color into theme? Instead of specifying color everywhere
+            const FONT_SIZE: f32 = 16.0;
 
-            terminal::draw_text(
-                TerminalPos {
-                    x: self.bounds.pos.x.to_u16_clamp(),
-                    y: self.bounds.pos.y.to_u16_clamp(),
-                },
-                format!(
-                    "{}{}{}",
-                    crossterm::style::Attribute::Reverse,
-                    final_content,
-                    crossterm::style::Attribute::Reset,
-                ),
-            )?;
+            drawer.draw_rect(
+                Brush::Solid(AlphaColor::new([0.7, 0.7, 0.7, 1.0])),
+                self.bounds,
+            );
+
+            drawer.draw_monospace_text(
+                FONT_SIZE,
+                Brush::Solid(AlphaColor::BLACK),
+                Affine::translate(Vec2::new(
+                    self.bounds.pos.x as f64,
+                    self.bounds.pos.y as f64,
+                )),
+                left,
+            );
+
+            let right_text_width = drawer.get_monospace_text_width(FONT_SIZE, &right).x;
+
+            drawer.draw_monospace_text(
+                FONT_SIZE,
+                Brush::Solid(AlphaColor::BLACK),
+                Affine::translate(Vec2::new(
+                    (self.bounds.pos.x + self.bounds.size.x - right_text_width) as f64,
+                    self.bounds.pos.y as f64,
+                )),
+                right,
+            );
         }
-
-        Ok(())
     }
 }
