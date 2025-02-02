@@ -10,6 +10,7 @@
 mod buffer;
 mod command_bar;
 mod commands;
+mod drawer;
 mod editor;
 mod highlighter;
 mod math;
@@ -19,9 +20,10 @@ mod status_bar;
 mod terminal;
 mod text_line;
 mod view;
+mod window;
 
-use editor::Editor;
+use window::EditorWindow;
 
 fn main() {
-    Editor::new().run();
+    EditorWindow::new().run();
 }

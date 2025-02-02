@@ -1,32 +1,21 @@
-use std::panic;
-
-use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use winit::{
+    event::{ElementState, KeyEvent},
+    event_loop::ActiveEventLoop,
+    keyboard::{Key, ModifiersState, NamedKey},
+};
 
 use crate::{
     buffer::Buffer,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
+    drawer::Drawer,
     math::{Bounds2u, Vec2u},
     message_bar::MessageBar,
     status_bar::StatusBar,
-    terminal,
     view::View,
 };
 
-fn setup_panic_hook() {
-    let current_hook = panic::take_hook();
-    panic::set_hook(Box::new(move |panic_info| {
-        // we can't do anything to recover if end_terminal returns an error,
-        // so just ignore the Result
-        let _ = terminal::end_terminal();
-        current_hook(panic_info);
-    }));
-}
-
 pub struct Editor {
-    should_quit: bool,
-
     /// this is used to block the user if he tries to
     /// quit the editor without saving a modified file
     block_quit_remaining_tries: usize,
@@ -38,36 +27,37 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new() -> Self {
-        let terminal_size = terminal::size_u64().expect("able to get terminal size");
+    pub fn new(window_size: Vec2u) -> Self {
+        // TODO: Refactor font size
+        const FONT_SIZE: u64 = 16;
 
         let view = View::new(Bounds2u {
             pos: Vec2u { x: 0, y: 0 },
             size: Vec2u {
-                x: terminal_size.x,
-                y: terminal_size.y.saturating_sub(2),
+                x: window_size.x,
+                y: window_size.y.saturating_sub(FONT_SIZE.saturating_mul(2)),
             },
         });
 
         let status_bar = StatusBar::new(Bounds2u {
             pos: Vec2u {
                 x: 0,
-                y: terminal_size.y.saturating_sub(2),
+                y: window_size.y.saturating_sub(FONT_SIZE.saturating_mul(2)),
             },
             size: Vec2u {
-                x: terminal_size.x,
-                y: u64::from(terminal_size.y > 1),
+                x: window_size.x,
+                y: FONT_SIZE,
             },
         });
 
         let mut message_bar = MessageBar::new(Bounds2u {
             pos: Vec2u {
                 x: 0,
-                y: terminal_size.y.saturating_sub(1),
+                y: window_size.y.saturating_sub(FONT_SIZE),
             },
             size: Vec2u {
-                x: terminal_size.x,
-                y: 1,
+                x: window_size.x,
+                y: FONT_SIZE,
             },
         });
         message_bar.set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
@@ -75,16 +65,15 @@ impl Editor {
         let command_bar = CommandBar::new(Bounds2u {
             pos: Vec2u {
                 x: 0,
-                y: terminal_size.y.saturating_sub(1),
+                y: window_size.y.saturating_sub(FONT_SIZE),
             },
             size: Vec2u {
-                x: terminal_size.x,
-                y: 1,
+                x: window_size.x,
+                y: FONT_SIZE,
             },
         });
 
         Self {
-            should_quit: false,
             block_quit_remaining_tries: 0,
             view,
             status_bar,
@@ -93,21 +82,7 @@ impl Editor {
         }
     }
 
-    pub fn run(&mut self) {
-        setup_panic_hook();
-
-        terminal::init_terminal().expect("able to initialize terminal");
-        terminal::set_title("[No Name]").expect("able to set title");
-
-        self.open_arg_file();
-
-        let repl_result = self.repl();
-
-        terminal::end_terminal().expect("able to deinit terminal");
-        repl_result.expect("repl has no fatal error");
-    }
-
-    fn open_arg_file(&mut self) {
+    pub fn open_arg_file(&mut self) {
         if let Some(filename) = std::env::args().nth(1) {
             let buffer = match Buffer::new_from_file(&filename) {
                 Ok(buffer) => buffer,
@@ -118,23 +93,13 @@ impl Editor {
                 }
             };
             self.view.replace_buffer(buffer);
-            terminal::set_title(&filename).expect("able to set title");
         }
     }
 
-    fn repl(&mut self) -> Result<()> {
-        while !self.should_quit {
-            let event = event::read()?;
-            self.handle_event(&event);
-            self.draw()?;
-        }
-        Ok(())
-    }
-
-    fn execute_command(&mut self, command: EditorCommand) -> bool {
+    fn execute_command(&mut self, command: EditorCommand, event_loop: &ActiveEventLoop) -> bool {
         if matches!(command, EditorCommand::QuitAll) {
             if self.block_quit_remaining_tries == 0 {
-                self.should_quit = true;
+                event_loop.exit();
             } else {
                 self.message_bar.set_message(format!(
                     "WARNING! File has unsaved changes. Press Ctrl-Q {} more times to quit.",
@@ -152,8 +117,7 @@ impl Editor {
                 self.command_bar.clear_prompt();
                 if matches!(prompt, CommandBarPrompt::SaveAs) {
                     self.view.change_filename(&value);
-                    terminal::set_title(value).expect("able to set title");
-                    self.execute_command(EditorCommand::WriteBufferToDisk);
+                    self.execute_command(EditorCommand::WriteBufferToDisk, event_loop);
                 }
             }
 
@@ -171,124 +135,118 @@ impl Editor {
         }
     }
 
-    fn handle_event(&mut self, event: &Event) -> bool {
-        match event {
-            Event::Key(KeyEvent {
-                code,
-                modifiers,
-                kind: KeyEventKind::Press,
-                ..
-            }) => {
-                let command = match (modifiers, code) {
-                    (&KeyModifiers::CONTROL, &KeyCode::Char('q')) => Some(EditorCommand::QuitAll),
-                    (&KeyModifiers::NONE, &KeyCode::Up) => Some(EditorCommand::MoveCursorUp),
-                    (&KeyModifiers::NONE, &KeyCode::Down) => Some(EditorCommand::MoveCursorDown),
-                    (&KeyModifiers::NONE, &KeyCode::Left) => Some(EditorCommand::MoveCursorLeft),
-                    (&KeyModifiers::NONE, &KeyCode::Right) => Some(EditorCommand::MoveCursorRight),
-                    (&KeyModifiers::NONE, &KeyCode::Home) => {
-                        Some(EditorCommand::MoveCursorToStartOfLine)
-                    }
-                    (&KeyModifiers::NONE, &KeyCode::End) => {
-                        Some(EditorCommand::MoveCursorToEndOfLine)
-                    }
-                    (&KeyModifiers::NONE, &KeyCode::PageUp) => {
-                        Some(EditorCommand::MoveCursorUpOnePage)
-                    }
-                    (&KeyModifiers::NONE, &KeyCode::PageDown) => {
-                        Some(EditorCommand::MoveCursorDownOnePage)
-                    }
-                    (&KeyModifiers::NONE | &KeyModifiers::SHIFT, &KeyCode::Char(ch)) => {
-                        // NOTE: for SHIFT case, crossterm automatically
-                        // converts ch to uppercase for us already. This
-                        // also means we do not need to manually handle
-                        // capslock scenario
-                        Some(EditorCommand::InsertCharacter(ch))
-                    }
-                    (&KeyModifiers::NONE, &KeyCode::Backspace) => {
+    pub fn handle_key_event(
+        &mut self,
+        event: &KeyEvent,
+        modifiers: &ModifiersState,
+        event_loop: &ActiveEventLoop,
+    ) {
+        if matches!(event.state, ElementState::Pressed) {
+            // we don't have any commands that rely on release for now
+            return;
+        }
+
+        let command = if modifiers == &ModifiersState::CONTROL {
+            if let Key::Character(ch) = &event.logical_key {
+                if ch == "q" {
+                    Some(EditorCommand::QuitAll)
+                } else if ch == "s" {
+                    Some(EditorCommand::WriteBufferToDisk)
+                } else if ch == "f" {
+                    Some(EditorCommand::StartSearch)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            if let Key::Character(ch) = &event.logical_key {
+                // TODO: Do we need to care about SHIFT & CAPS LOCK?
+                Some(EditorCommand::InsertCharacter(
+                    ch.chars().next().expect("one character"),
+                ))
+            } else {
+                match event.logical_key {
+                    Key::Named(NamedKey::ArrowUp) => Some(EditorCommand::MoveCursorUp),
+                    Key::Named(NamedKey::ArrowDown) => Some(EditorCommand::MoveCursorDown),
+                    Key::Named(NamedKey::ArrowLeft) => Some(EditorCommand::MoveCursorLeft),
+                    Key::Named(NamedKey::ArrowRight) => Some(EditorCommand::MoveCursorRight),
+                    Key::Named(NamedKey::Home) => Some(EditorCommand::MoveCursorToStartOfLine),
+                    Key::Named(NamedKey::End) => Some(EditorCommand::MoveCursorToEndOfLine),
+                    Key::Named(NamedKey::PageUp) => Some(EditorCommand::MoveCursorUpOnePage),
+                    Key::Named(NamedKey::PageDown) => Some(EditorCommand::MoveCursorDownOnePage),
+                    Key::Named(NamedKey::Backspace) => {
                         Some(EditorCommand::EraseCharacterBeforeCursor)
                     }
-                    (&KeyModifiers::NONE, &KeyCode::Delete) => {
-                        Some(EditorCommand::EraseCharacterAfterCursor)
-                    }
-                    (&KeyModifiers::NONE, &KeyCode::Tab) => {
-                        Some(EditorCommand::InsertCharacter('\t'))
-                    }
-                    (&KeyModifiers::NONE, &KeyCode::Enter) => Some(EditorCommand::InsertNewline),
-                    (&KeyModifiers::CONTROL, &KeyCode::Char('s')) => {
-                        Some(EditorCommand::WriteBufferToDisk)
-                    }
-                    (&KeyModifiers::NONE, &KeyCode::Esc) => Some(EditorCommand::Dismiss),
-                    (&KeyModifiers::CONTROL, &KeyCode::Char('f')) => {
-                        Some(EditorCommand::StartSearch)
-                    }
+                    Key::Named(NamedKey::Delete) => Some(EditorCommand::EraseCharacterAfterCursor),
+                    Key::Named(NamedKey::Tab) => Some(EditorCommand::InsertCharacter('\t')),
+                    Key::Named(NamedKey::Enter) => Some(EditorCommand::InsertNewline),
+                    Key::Named(NamedKey::Escape) => Some(EditorCommand::Dismiss),
                     _ => None,
-                };
-
-                if let Some(command) = command {
-                    self.execute_command(command)
-                } else {
-                    false
                 }
             }
-            Event::Resize(width, height) => {
-                self.view.set_bounds(Bounds2u {
-                    pos: Vec2u { x: 0, y: 0 },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: height.saturating_sub(2).into(),
-                    },
-                });
-                self.status_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(2).into(),
-                    },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: u64::from(*height > 1),
-                    },
-                });
-                self.message_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(1).into(),
-                    },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: 1,
-                    },
-                });
-                self.command_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(1).into(),
-                    },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: 1,
-                    },
-                });
-                true
-            }
-            _ => false,
+        };
+
+        if let Some(command) = command {
+            self.execute_command(command, event_loop);
         }
     }
 
-    fn draw(&self) -> Result<()> {
-        let mut state = terminal::start_draw()?;
+    pub fn resize(&mut self, new_size: Vec2u) {
+        // TODO: Refactor font size
+        const FONT_SIZE: u64 = 16;
 
-        let mut new_cursor_pos = self.view.render()?;
-        self.status_bar.render(self.view.get_status())?;
+        self.view.set_bounds(Bounds2u {
+            pos: Vec2u { x: 0, y: 0 },
+            size: Vec2u {
+                x: new_size.x,
+                y: new_size.y.saturating_sub(FONT_SIZE.saturating_mul(2)),
+            },
+        });
+        self.status_bar.set_bounds(Bounds2u {
+            pos: Vec2u {
+                x: 0,
+                y: new_size.y.saturating_sub(FONT_SIZE.saturating_mul(2)),
+            },
+            size: Vec2u {
+                x: new_size.x,
+                y: FONT_SIZE,
+            },
+        });
+        self.message_bar.set_bounds(Bounds2u {
+            pos: Vec2u {
+                x: 0,
+                y: new_size.y.saturating_sub(FONT_SIZE),
+            },
+            size: Vec2u {
+                x: new_size.x,
+                y: FONT_SIZE,
+            },
+        });
+        self.command_bar.set_bounds(Bounds2u {
+            pos: Vec2u {
+                x: 0,
+                y: new_size.y.saturating_sub(FONT_SIZE),
+            },
+            size: Vec2u {
+                x: new_size.x,
+                y: FONT_SIZE,
+            },
+        });
+    }
 
-        if self.command_bar.has_active_prompt() {
-            new_cursor_pos = self.command_bar.render()?;
-        } else {
-            self.message_bar.render()?;
-        }
+    pub fn render(&self, drawer: &mut Drawer) {
+        // TODO: Restore implementation
+        // TODO: Handle cursor pos
 
-        state.cursor_pos = new_cursor_pos;
-
-        terminal::end_draw(&state)?;
-        Ok(())
+        //self.view.render()?;
+        self.status_bar.render(drawer, self.view.get_status());
+        //
+        //if self.command_bar.has_active_prompt() {
+        //    self.command_bar.render()?;
+        //} else {
+        self.message_bar.render(drawer);
+        //}
     }
 }

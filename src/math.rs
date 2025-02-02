@@ -1,3 +1,5 @@
+use winit::dpi::{LogicalSize, PhysicalSize};
+
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct Vec2u {
     pub x: u64,
@@ -9,6 +11,21 @@ impl Vec2u {
 
     pub fn saturating_area(&self) -> u64 {
         self.x.saturating_mul(self.y)
+    }
+}
+
+impl From<PhysicalSize<u32>> for Vec2u {
+    fn from(value: PhysicalSize<u32>) -> Self {
+        Self {
+            x: u64::from(value.width),
+            y: u64::from(value.height),
+        }
+    }
+}
+
+impl From<Vec2u> for LogicalSize<u32> {
+    fn from(value: Vec2u) -> Self {
+        Self::new(value.x.to_u32_clamp(), value.y.to_u32_clamp())
     }
 }
 
@@ -46,6 +63,20 @@ where
 
 impl ToU16Clamp for u64 {}
 impl ToU16Clamp for usize {}
+
+pub trait ToU32Clamp
+where
+    Self: TryInto<u32>,
+{
+    /// This is used to get rid of the `clippy::cast_possible_truncation`
+    /// lint error, as `Self` may have more bits than `u32`. When that happens,
+    /// then we clamp the value to `u32::MAX`
+    fn to_u32_clamp(self) -> u32 {
+        self.try_into().unwrap_or(u32::MAX)
+    }
+}
+
+impl ToU32Clamp for u64 {}
 
 pub trait ToU64 {
     fn to_u64(self) -> u64;
