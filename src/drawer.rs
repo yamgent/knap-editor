@@ -165,7 +165,11 @@ fn get_glyphs<T: AsRef<str>>(
                 id: gid.to_u32(),
                 x,
                 // glyph's origin is bottom-left, unlike the normal convention of top-left...
-                y: current_y + metrics.ascent + metrics.descent + 1.0,
+                // TODO: When we are able to use f64 for our drawing positions, then the ceil()
+                // will no longer be necessary. Right now it is needed because our drawing
+                // positions are all in integers, so the text will look off unless we get rid
+                // of the decimal points
+                y: (current_y + metrics.ascent + metrics.descent).ceil(),
             })
         })
         .collect();
