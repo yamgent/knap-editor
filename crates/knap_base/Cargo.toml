@@ -1,10 +1,9 @@
 [package]
-name = "knap"
+name = "knap_base"
 version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-knap_edit = { path = "../knap_edit" }
 
 [lints]
 workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "knap_window"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+crossterm = "0.28.1"
+knap_base = { path = "../knap_base" }
+
+[lints]
+workspace = true

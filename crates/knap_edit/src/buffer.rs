@@ -1,12 +1,12 @@
 use std::{fs::File, io::Write, ops::Range};
 
 use anyhow::Result;
+use knap_base::math::{ToU64, ToUsizeClamp, Vec2u};
+use knap_window::terminal::{self, TerminalPos};
 
 use crate::{
     highlighter::Highlights,
-    math::{ToU64, ToUsizeClamp, Vec2u},
     search::SearchDirection,
-    terminal::{self, TerminalPos},
     text_line::{InsertCharError, InsertCharResult, TextLine},
 };
 
