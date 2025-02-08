@@ -1,11 +1,3 @@
-[package]
-name = "knap_editor"
-version = "0.0.0"
-edition = "2021"
-
-[dependencies]
-anyhow = "1.0.95"
-crossterm = "0.28.1"
-regex = "1.11.1"
-unicode-segmentation = "1.12.0"
-unicode-width = "0.2.0"
+[workspace]
+resolver = "2"
+members = ["crates/*"]

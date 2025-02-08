@@ -71,7 +71,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "knap_editor"
+name = "knap"
 version = "0.0.0"
 dependencies = [
  "anyhow",
