@@ -1,5 +1,6 @@
 use anyhow::Result;
 use knap_base::math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u};
+use knap_window::terminal::TerminalPos;
 
 use crate::{
     buffer::Buffer,
@@ -9,7 +10,6 @@ use crate::{
     message_bar::MessageBar,
     search::SearchDirection,
     status_bar::ViewStatus,
-    terminal::TerminalPos,
 };
 
 pub struct View {

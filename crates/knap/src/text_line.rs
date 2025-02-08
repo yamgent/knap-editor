@@ -3,13 +3,13 @@ use std::{error::Error, fmt::Display, ops::Range};
 use anyhow::Result;
 use crossterm::style::Color;
 use knap_base::math::ToU16Clamp;
+use knap_window::terminal::{self, TerminalPos};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
     highlighter::{HighlightType, Highlights},
     search::SearchDirection,
-    terminal::{self, TerminalPos},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]

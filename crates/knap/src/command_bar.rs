@@ -1,14 +1,10 @@
 use anyhow::Result;
 use knap_base::math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u};
+use knap_window::terminal::{self, TerminalPos};
 
 use crate::{
-    commands::EditorCommand,
-    highlighter::Highlights,
-    message_bar::MessageBar,
-    search::SearchDirection,
-    terminal::{self, TerminalPos},
-    text_line::TextLine,
-    view::View,
+    commands::EditorCommand, highlighter::Highlights, message_bar::MessageBar,
+    search::SearchDirection, text_line::TextLine, view::View,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]

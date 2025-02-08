@@ -1,7 +1,6 @@
 use anyhow::Result;
 use knap_base::math::{Bounds2u, ToU16Clamp};
-
-use crate::terminal::{self, TerminalPos};
+use knap_window::terminal::{self, TerminalPos};
 
 pub struct MessageBar {
     bounds: Bounds2u,

@@ -6,7 +6,6 @@ mod highlighter;
 mod message_bar;
 mod search;
 mod status_bar;
-mod terminal;
 mod text_line;
 mod view;
 

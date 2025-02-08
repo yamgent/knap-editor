@@ -3,6 +3,7 @@ use std::panic;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use knap_base::math::{Bounds2u, Vec2u};
+use knap_window::terminal;
 
 use crate::{
     buffer::Buffer,
@@ -10,7 +11,6 @@ use crate::{
     commands::EditorCommand,
     message_bar::MessageBar,
     status_bar::StatusBar,
-    terminal,
     view::View,
 };
 
