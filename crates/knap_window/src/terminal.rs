@@ -6,7 +6,7 @@ use crossterm::{
     style::{self, Color},
     terminal,
 };
-use knap_base::math::Vec2u;
+use knap_base::math::Vec2f;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalSize {
@@ -60,9 +60,9 @@ pub fn end_draw(restore_state: &TerminalRestoreState) -> Result<()> {
     Ok(())
 }
 
-pub fn size_u64() -> Result<Vec2u> {
+pub fn size_f64() -> Result<Vec2f> {
     let size = terminal::size()?;
-    Ok(Vec2u {
+    Ok(Vec2f {
         x: size.0.into(),
         y: size.1.into(),
     })
@@ -83,13 +83,13 @@ fn move_cursor(pos: TerminalPos) -> Result<()> {
     Ok(())
 }
 
-pub fn draw_text<T: AsRef<str>>(pos: TerminalPos, text: T) -> Result<()> {
+pub(crate) fn draw_text<T: AsRef<str>>(pos: TerminalPos, text: T) -> Result<()> {
     move_cursor(pos)?;
     queue!(io::stdout(), style::Print(text.as_ref()))?;
     Ok(())
 }
 
-pub fn draw_colored_text<T: AsRef<str>>(
+pub(crate) fn draw_colored_text<T: AsRef<str>>(
     pos: TerminalPos,
     text: T,
     foreground: Option<Color>,

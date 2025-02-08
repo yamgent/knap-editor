@@ -1,6 +1,6 @@
 use anyhow::Result;
-use knap_base::math::{Bounds2u, ToU16Clamp, ToUsizeClamp, Vec2u};
-use knap_window::terminal::{self, TerminalPos};
+use knap_base::math::{Bounds2f, Vec2u};
+use knap_window::drawer::Drawer;
 
 use crate::buffer::FileType;
 
@@ -13,21 +13,21 @@ pub struct ViewStatus {
 }
 
 pub struct StatusBar {
-    bounds: Bounds2u,
+    bounds: Bounds2f,
 }
 
 impl StatusBar {
-    pub fn new(bounds: Bounds2u) -> Self {
+    pub fn new(bounds: Bounds2f) -> Self {
         Self { bounds }
     }
 
-    pub fn set_bounds(&mut self, bounds: Bounds2u) {
+    pub fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
     }
 
-    pub fn render(&self, view_status: ViewStatus) -> Result<()> {
-        if self.bounds.size.saturating_area() > 0 {
-            let size_x = self.bounds.size.x.to_usize_clamp();
+    pub fn render(&self, drawer: &mut Drawer, view_status: ViewStatus) -> Result<()> {
+        if self.bounds.size.x * self.bounds.size.y > 0.0 {
+            let size_x = self.bounds.size.x as usize;
 
             let left = format!(
                 "{} - {} lines {}",
@@ -59,18 +59,15 @@ impl StatusBar {
                 format!("{left}{right:>right_space$}")
             };
 
-            terminal::draw_text(
-                TerminalPos {
-                    x: self.bounds.pos.x.to_u16_clamp(),
-                    y: self.bounds.pos.y.to_u16_clamp(),
-                },
+            drawer.draw_text(
+                self.bounds.pos,
                 format!(
                     "{}{}{}",
                     crossterm::style::Attribute::Reverse,
                     final_content,
                     crossterm::style::Attribute::Reset,
                 ),
-            )?;
+            );
         }
 
         Ok(())

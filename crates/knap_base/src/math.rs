@@ -12,10 +12,26 @@ impl Vec2u {
     }
 }
 
+#[derive(Default, Clone, Copy, PartialEq)]
+pub struct Vec2f {
+    pub x: f64,
+    pub y: f64,
+}
+
+impl Vec2f {
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+}
+
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct Bounds2u {
     pub pos: Vec2u,
     pub size: Vec2u,
+}
+
+#[derive(Default, Clone, Copy, PartialEq)]
+pub struct Bounds2f {
+    pub pos: Vec2f,
+    pub size: Vec2f,
 }
 
 pub trait ToUsizeClamp
@@ -46,6 +62,13 @@ where
 
 impl ToU16Clamp for u64 {}
 impl ToU16Clamp for usize {}
+
+pub fn f64_to_u16_clamp(value: f64) -> u16 {
+    #[allow(clippy::as_conversions)]
+    let result = value.clamp(0.0, u16::MAX as f64) as u16;
+
+    result
+}
 
 pub trait ToU64 {
     fn to_u64(self) -> u64;

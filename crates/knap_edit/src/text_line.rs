@@ -1,9 +1,8 @@
 use std::{error::Error, fmt::Display, ops::Range};
 
 use anyhow::Result;
-use crossterm::style::Color;
-use knap_base::math::ToU16Clamp;
-use knap_window::terminal::{self, TerminalPos};
+use knap_base::{color::Color, math::Vec2f};
+use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
@@ -141,10 +140,11 @@ impl TextLine {
     #[allow(clippy::too_many_lines)]
     pub fn render_line(
         &self,
-        screen_pos: TerminalPos,
+        drawer: &mut Drawer,
+        screen_pos: Vec2f,
         text_offset_x: Range<u64>,
         highlights: &Highlights,
-    ) -> Result<()> {
+    ) {
         let mut current_x = 0;
         let mut fragment_iter = self.fragments.iter();
 
@@ -200,53 +200,41 @@ impl TextLine {
                     acc
                 },
             );
-            grouped_strings
-                .into_iter()
-                .fold(
-                    (0u64, Ok(())),
-                    |(x_offset, recent_result), (string, string_width, highlight_type)| {
-                        if recent_result.is_err() {
-                            (0, recent_result)
-                        } else {
-                            let next_x_offset = x_offset.saturating_add(string_width);
-                            let (foreground, background) = match highlight_type {
-                                None => (None, None),
-                                Some(HighlightType::SearchMatch) => {
-                                    (Some(Color::Black), Some(Color::Yellow))
-                                }
-                                Some(HighlightType::SearchCursor) => {
-                                    (Some(Color::Black), Some(Color::Blue))
-                                }
-                                Some(HighlightType::Number) => (Some(Color::DarkRed), None),
-                                Some(HighlightType::Keyword) => (Some(Color::Blue), None),
-                                Some(HighlightType::BasicType) => (Some(Color::Green), None),
-                                Some(HighlightType::EnumLiteral) => (Some(Color::DarkBlue), None),
-                                Some(HighlightType::Character) => (Some(Color::DarkYellow), None),
-                                Some(HighlightType::LifetimeSpecifier) => {
-                                    (Some(Color::DarkYellow), None)
-                                }
-                                Some(HighlightType::Comment) => (Some(Color::DarkGreen), None),
-                            };
-
-                            (
-                                next_x_offset,
-                                terminal::draw_colored_text(
-                                    TerminalPos {
-                                        x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                        y: screen_pos.y,
-                                    },
-                                    string,
-                                    foreground,
-                                    background,
-                                ),
-                            )
+            grouped_strings.into_iter().fold(
+                0u64,
+                |x_offset, (string, string_width, highlight_type)| {
+                    let next_x_offset = x_offset.saturating_add(string_width);
+                    let (foreground, background) = match highlight_type {
+                        None => (None, None),
+                        Some(HighlightType::SearchMatch) => {
+                            (Some(Color::BLACK), Some(Color::YELLOW))
                         }
-                    },
-                )
-                .1?;
-        }
+                        Some(HighlightType::SearchCursor) => {
+                            (Some(Color::BLACK), Some(Color::BLUE))
+                        }
+                        Some(HighlightType::Number) => (Some(Color::DARK_RED), None),
+                        Some(HighlightType::Keyword) => (Some(Color::BLUE), None),
+                        Some(HighlightType::BasicType) => (Some(Color::GREEN), None),
+                        Some(HighlightType::EnumLiteral) => (Some(Color::CYAN), None),
+                        Some(HighlightType::Character) => (Some(Color::DARK_YELLOW), None),
+                        Some(HighlightType::LifetimeSpecifier) => (Some(Color::DARK_YELLOW), None),
+                        Some(HighlightType::Comment) => (Some(Color::DARK_GREEN), None),
+                    };
 
-        Ok(())
+                    drawer.draw_colored_text(
+                        Vec2f {
+                            x: screen_pos.x + x_offset as f64,
+                            y: screen_pos.y,
+                        },
+                        string,
+                        foreground,
+                        background,
+                    );
+
+                    next_x_offset
+                },
+            );
+        }
     }
 
     pub fn insert_character(

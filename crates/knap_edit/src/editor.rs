@@ -2,8 +2,8 @@ use std::panic;
 
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use knap_base::math::{Bounds2u, Vec2u};
-use knap_window::terminal;
+use knap_base::math::{Bounds2f, Vec2f};
+use knap_window::{drawer::Drawer, terminal};
 
 use crate::{
     buffer::Buffer,
@@ -26,6 +26,7 @@ fn setup_panic_hook() {
 
 pub struct Editor {
     should_quit: bool,
+    drawer: Drawer,
 
     /// this is used to block the user if he tries to
     /// quit the editor without saving a modified file
@@ -39,52 +40,53 @@ pub struct Editor {
 
 impl Editor {
     pub fn new() -> Self {
-        let terminal_size = terminal::size_u64().expect("able to get terminal size");
+        let terminal_size = terminal::size_f64().expect("able to get terminal size");
 
-        let view = View::new(Bounds2u {
-            pos: Vec2u { x: 0, y: 0 },
-            size: Vec2u {
+        let view = View::new(Bounds2f {
+            pos: Vec2f::ZERO,
+            size: Vec2f {
                 x: terminal_size.x,
-                y: terminal_size.y.saturating_sub(2),
+                y: terminal_size.y - 2.0,
             },
         });
 
-        let status_bar = StatusBar::new(Bounds2u {
-            pos: Vec2u {
-                x: 0,
-                y: terminal_size.y.saturating_sub(2),
+        let status_bar = StatusBar::new(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: terminal_size.y - 2.0,
             },
-            size: Vec2u {
+            size: Vec2f {
                 x: terminal_size.x,
-                y: u64::from(terminal_size.y > 1),
+                y: if terminal_size.y > 1.0 { 1.0 } else { 0.0 },
             },
         });
 
-        let mut message_bar = MessageBar::new(Bounds2u {
-            pos: Vec2u {
-                x: 0,
-                y: terminal_size.y.saturating_sub(1),
+        let mut message_bar = MessageBar::new(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: terminal_size.y - 1.0,
             },
-            size: Vec2u {
+            size: Vec2f {
                 x: terminal_size.x,
-                y: 1,
+                y: 1.0,
             },
         });
         message_bar.set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
 
-        let command_bar = CommandBar::new(Bounds2u {
-            pos: Vec2u {
-                x: 0,
-                y: terminal_size.y.saturating_sub(1),
+        let command_bar = CommandBar::new(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: terminal_size.y - 1.0,
             },
-            size: Vec2u {
+            size: Vec2f {
                 x: terminal_size.x,
-                y: 1,
+                y: 1.0,
             },
         });
 
         Self {
             should_quit: false,
+            drawer: Drawer::new(),
             block_quit_remaining_tries: 0,
             view,
             status_bar,
@@ -231,42 +233,41 @@ impl Editor {
                 }
             }
             Event::Resize(width, height) => {
-                self.view.set_bounds(Bounds2u {
-                    pos: Vec2u { x: 0, y: 0 },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: height.saturating_sub(2).into(),
+                let size = Vec2f {
+                    x: f64::from(*width),
+                    y: f64::from(*height),
+                };
+
+                self.view.set_bounds(Bounds2f {
+                    pos: Vec2f::ZERO,
+                    size: Vec2f {
+                        x: size.x,
+                        y: size.y - 2.0,
                     },
                 });
-                self.status_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(2).into(),
+                self.status_bar.set_bounds(Bounds2f {
+                    pos: Vec2f {
+                        x: 0.0,
+                        y: size.y - 2.0,
                     },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: u64::from(*height > 1),
-                    },
-                });
-                self.message_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(1).into(),
-                    },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: 1,
+                    size: Vec2f {
+                        x: size.x,
+                        y: if size.y > 1.0 { 1.0 } else { 0.0 },
                     },
                 });
-                self.command_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(1).into(),
+                self.message_bar.set_bounds(Bounds2f {
+                    pos: Vec2f {
+                        x: 0.0,
+                        y: size.y - 1.0,
                     },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: 1,
+                    size: Vec2f { x: size.x, y: 1.0 },
+                });
+                self.command_bar.set_bounds(Bounds2f {
+                    pos: Vec2f {
+                        x: 0.0,
+                        y: size.y - 1.0,
                     },
+                    size: Vec2f { x: size.x, y: 1.0 },
                 });
                 true
             }
@@ -274,20 +275,22 @@ impl Editor {
         }
     }
 
-    fn draw(&self) -> Result<()> {
+    fn draw(&mut self) -> Result<()> {
         let mut state = terminal::start_draw()?;
 
-        let mut new_cursor_pos = self.view.render()?;
-        self.status_bar.render(self.view.get_status())?;
+        let mut new_cursor_pos = self.view.render(&mut self.drawer)?;
+        self.status_bar
+            .render(&mut self.drawer, self.view.get_status())?;
 
         if self.command_bar.has_active_prompt() {
-            new_cursor_pos = self.command_bar.render()?;
+            new_cursor_pos = self.command_bar.render(&mut self.drawer)?;
         } else {
-            self.message_bar.render()?;
+            self.message_bar.render(&mut self.drawer)?;
         }
 
         state.cursor_pos = new_cursor_pos;
 
+        self.drawer.present()?;
         terminal::end_draw(&state)?;
         Ok(())
     }

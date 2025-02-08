@@ -1,6 +1,6 @@
 use anyhow::Result;
-use knap_base::math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u};
-use knap_window::terminal::{self, TerminalPos};
+use knap_base::math::{self, Bounds2f, ToU16Clamp, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_window::{drawer::Drawer, terminal::TerminalPos};
 
 use crate::{
     commands::EditorCommand, highlighter::Highlights, message_bar::MessageBar,
@@ -28,7 +28,7 @@ impl CommandBarPrompt {
 // explore whether it is possible to share code between this and View
 // (or support single-line mode for View and use that).
 pub struct CommandBar {
-    bounds: Bounds2u,
+    bounds: Bounds2f,
 
     prompt: CommandBarPrompt,
     input: TextLine,
@@ -44,7 +44,7 @@ pub struct CommandBarExecuteResult {
 }
 
 impl CommandBar {
-    pub fn new(bounds: Bounds2u) -> Self {
+    pub fn new(bounds: Bounds2f) -> Self {
         Self {
             bounds,
             prompt: CommandBarPrompt::None,
@@ -54,7 +54,7 @@ impl CommandBar {
         }
     }
 
-    pub fn set_bounds(&mut self, bounds: Bounds2u) {
+    pub fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
     }
 
@@ -73,56 +73,55 @@ impl CommandBar {
         !matches!(self.prompt, CommandBarPrompt::None)
     }
 
-    pub fn get_input_bounds(&self) -> Bounds2u {
+    pub fn get_input_bounds(&self) -> Bounds2f {
         let prompt = self.prompt.get_display();
-        let prompt_len = prompt.chars().count().to_u64();
-        let input_start_x = self.bounds.pos.x.saturating_add(prompt_len);
-        let input_size_x = self.bounds.size.x.saturating_sub(prompt_len);
+        let prompt_len = prompt.chars().count() as f64;
+        let input_start_x = self.bounds.pos.x + prompt_len;
+        let input_size_x = self.bounds.size.x - prompt_len;
 
-        Bounds2u {
-            pos: Vec2u {
+        Bounds2f {
+            pos: Vec2f {
                 x: input_start_x,
                 y: self.bounds.pos.y,
             },
-            size: Vec2u {
+            size: Vec2f {
                 x: input_size_x,
                 y: self.bounds.size.y,
             },
         }
     }
 
-    pub fn render(&self) -> Result<TerminalPos> {
-        if self.bounds.size.saturating_area() > 0 {
+    pub fn render(&self, drawer: &mut Drawer) -> Result<TerminalPos> {
+        if self.bounds.size.x * self.bounds.size.y > 0.0 {
             let prompt = self.prompt.get_display();
 
-            terminal::draw_text(
-                TerminalPos {
-                    x: self.bounds.pos.x.to_u16_clamp(),
-                    y: self.bounds.pos.y.to_u16_clamp(),
-                },
-                &prompt,
-            )?;
+            drawer.draw_text(self.bounds.pos, &prompt);
 
             let input_bounds = self.get_input_bounds();
 
             self.input.render_line(
-                TerminalPos {
-                    x: input_bounds.pos.x.to_u16_clamp(),
-                    y: self.bounds.pos.y.to_u16_clamp(),
+                drawer,
+                Vec2f {
+                    x: input_bounds.pos.x,
+                    y: self.bounds.pos.y,
                 },
-                self.scroll_offset.x..(self.scroll_offset.x.saturating_add(input_bounds.size.x)),
+                self.scroll_offset.x
+                    ..(self
+                        .scroll_offset
+                        .x
+                        .saturating_add(input_bounds.size.x as u64)),
                 &Highlights::new(),
-            )?;
+            );
 
             let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
             Ok(TerminalPos {
-                x: input_bounds.pos.x.to_u16_clamp().saturating_add(
+                x: math::f64_to_u16_clamp(input_bounds.pos.x).saturating_add(
                     grid_cursor_pos
                         .x
                         .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
                 ),
-                y: input_bounds.pos.y.to_u16_clamp().saturating_add(
+                y: math::f64_to_u16_clamp(input_bounds.pos.y).saturating_add(
                     grid_cursor_pos
                         .y
                         .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
@@ -130,8 +129,8 @@ impl CommandBar {
             })
         } else {
             Ok(TerminalPos {
-                x: self.bounds.pos.x.to_u16_clamp(),
-                y: self.bounds.pos.y.to_u16_clamp(),
+                x: math::f64_to_u16_clamp(self.bounds.pos.x),
+                y: math::f64_to_u16_clamp(self.bounds.pos.y),
             })
         }
     }
@@ -159,13 +158,13 @@ impl CommandBar {
             >= self
                 .scroll_offset
                 .x
-                .saturating_add(input_bounds.size.x)
+                .saturating_add(input_bounds.size.x as u64)
                 .to_u16_clamp()
         {
             self.scroll_offset.x = u64::from(
                 grid_cursor_pos
                     .x
-                    .saturating_sub(input_bounds.size.x.to_u16_clamp())
+                    .saturating_sub(input_bounds.size.x as u16)
                     .saturating_add(1),
             );
         }

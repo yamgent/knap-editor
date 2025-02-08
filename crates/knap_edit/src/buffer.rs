@@ -1,8 +1,8 @@
 use std::{fs::File, io::Write, ops::Range};
 
 use anyhow::Result;
-use knap_base::math::{ToU64, ToUsizeClamp, Vec2u};
-use knap_window::terminal::{self, TerminalPos};
+use knap_base::math::{ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_window::drawer::Drawer;
 
 use crate::{
     highlighter::Highlights,
@@ -107,14 +107,15 @@ impl Buffer {
 
     pub fn render_line(
         &self,
+        drawer: &mut Drawer,
         line_idx: usize,
-        screen_pos: TerminalPos,
+        screen_pos: Vec2f,
         text_offset_x: Range<u64>,
         line_highlight: &Highlights,
-    ) -> Result<()> {
+    ) {
         match self.content.get(line_idx) {
-            Some(line) => line.render_line(screen_pos, text_offset_x, line_highlight),
-            None => terminal::draw_text(screen_pos, "~"),
+            Some(line) => line.render_line(drawer, screen_pos, text_offset_x, line_highlight),
+            None => drawer.draw_text(screen_pos, "~"),
         }
     }
 
