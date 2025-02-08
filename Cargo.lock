@@ -74,6 +74,17 @@ dependencies = [
 name = "knap"
 version = "0.0.0"
 dependencies = [
+ "knap_edit",
+]
+
+[[package]]
+name = "knap_base"
+version = "0.0.0"
+
+[[package]]
+name = "knap_edit"
+version = "0.0.0"
+dependencies = [
  "anyhow",
  "crossterm",
  "knap_base",
@@ -82,10 +93,6 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width",
 ]
-
-[[package]]
-name = "knap_base"
-version = "0.0.0"
 
 [[package]]
 name = "knap_window"
