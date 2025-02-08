@@ -294,6 +294,7 @@ impl TextLine {
         }
     }
 
+    #[must_use]
     pub fn split_off(&mut self, fragment_idx: usize) -> Self {
         let left = self
             .fragments
