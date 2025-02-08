@@ -4,13 +4,11 @@ use std::{
     ops::Range,
 };
 
+use knap_base::math::{ToUsizeClamp, Vec2u};
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{
-    buffer::{Buffer, FileType},
-    math::{ToUsizeClamp, Vec2u},
-};
+use crate::buffer::{Buffer, FileType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HighlightType {

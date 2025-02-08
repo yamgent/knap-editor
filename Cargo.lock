@@ -76,10 +76,15 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossterm",
+ "knap_base",
  "regex",
  "unicode-segmentation",
  "unicode-width",
 ]
+
+[[package]]
+name = "knap_base"
+version = "0.0.0"
 
 [[package]]
 name = "libc"

@@ -6,8 +6,7 @@ use crossterm::{
     style::{self, Color},
     terminal,
 };
-
-use crate::math::Vec2u;
+use knap_base::math::Vec2u;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct TerminalSize {

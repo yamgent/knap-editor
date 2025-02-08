@@ -1,8 +1,8 @@
 use anyhow::Result;
+use knap_base::math::{Bounds2u, ToU16Clamp, ToUsizeClamp, Vec2u};
 
 use crate::{
     buffer::FileType,
-    math::{Bounds2u, ToU16Clamp, ToUsizeClamp, Vec2u},
     terminal::{self, TerminalPos},
 };
 

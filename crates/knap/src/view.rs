@@ -1,11 +1,11 @@
 use anyhow::Result;
+use knap_base::math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u};
 
 use crate::{
     buffer::Buffer,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
     highlighter::{HighlightInfo, Highlights},
-    math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
     search::SearchDirection,
     status_bar::ViewStatus,

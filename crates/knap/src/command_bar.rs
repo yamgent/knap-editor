@@ -1,9 +1,9 @@
 use anyhow::Result;
+use knap_base::math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u};
 
 use crate::{
     commands::EditorCommand,
     highlighter::Highlights,
-    math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u},
     message_bar::MessageBar,
     search::SearchDirection,
     terminal::{self, TerminalPos},

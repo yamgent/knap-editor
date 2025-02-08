@@ -2,12 +2,12 @@ use std::panic;
 
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use knap_base::math::{Bounds2u, Vec2u};
 
 use crate::{
     buffer::Buffer,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
-    math::{Bounds2u, Vec2u},
     message_bar::MessageBar,
     status_bar::StatusBar,
     terminal,
