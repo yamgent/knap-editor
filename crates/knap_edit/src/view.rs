@@ -124,11 +124,11 @@ impl View {
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
         if grid_cursor_pos.x < self.scroll_offset.x {
-            self.scroll_offset.x = u64::from(grid_cursor_pos.x);
+            self.scroll_offset.x = grid_cursor_pos.x;
         }
 
         if grid_cursor_pos.y < self.scroll_offset.y {
-            self.scroll_offset.y = u64::from(grid_cursor_pos.y);
+            self.scroll_offset.y = grid_cursor_pos.y;
         }
 
         if grid_cursor_pos.x
@@ -137,12 +137,10 @@ impl View {
                 .x
                 .saturating_add(math::f64_to_u64_clamp(self.bounds.size.x))
         {
-            self.scroll_offset.x = u64::from(
-                grid_cursor_pos
-                    .x
-                    .saturating_sub(math::f64_to_u64_clamp(self.bounds.size.x))
-                    .saturating_add(1),
-            );
+            self.scroll_offset.x = grid_cursor_pos
+                .x
+                .saturating_sub(math::f64_to_u64_clamp(self.bounds.size.x))
+                .saturating_add(1);
         }
 
         if grid_cursor_pos.y
@@ -151,12 +149,10 @@ impl View {
                 .y
                 .saturating_add(math::f64_to_u64_clamp(self.bounds.size.y))
         {
-            self.scroll_offset.y = u64::from(
-                grid_cursor_pos
-                    .y
-                    .saturating_sub(math::f64_to_u64_clamp(self.bounds.size.y))
-                    .saturating_add(1),
-            );
+            self.scroll_offset.y = grid_cursor_pos
+                .y
+                .saturating_sub(math::f64_to_u64_clamp(self.bounds.size.y))
+                .saturating_add(1);
         }
     }
 
