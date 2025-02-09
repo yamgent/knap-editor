@@ -71,10 +71,21 @@ impl ToU16Clamp for u64 {}
 impl ToU16Clamp for usize {}
 
 pub fn f64_to_u16_clamp(value: f64) -> u16 {
-    #[allow(clippy::as_conversions)]
-    let result = value.clamp(0.0, u16::MAX as f64) as u16;
-
-    result
+    if value.is_finite() {
+        if value <= 0.0 {
+            0
+        } else if value >= u16::MAX.into() {
+            u16::MAX
+        } else {
+            #[allow(clippy::cast_possible_truncation)]
+            #[allow(clippy::cast_sign_loss)]
+            #[allow(clippy::as_conversions)]
+            let result = value as u16;
+            result
+        }
+    } else {
+        0
+    }
 }
 
 pub trait ToU64 {
