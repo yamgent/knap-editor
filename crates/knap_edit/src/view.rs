@@ -1,4 +1,4 @@
-use knap_base::math::{Bounds2f, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_base::math::{self, Bounds2f, ToU64, ToUsizeClamp, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -85,7 +85,7 @@ impl View {
     }
 
     pub fn render(&self, drawer: &mut Drawer) {
-        (0..(self.bounds.size.y as u64)).for_each(|y| {
+        (0..(math::f64_to_u64_clamp(self.bounds.size.y))).for_each(|y| {
             let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
             self.buffer.render_line(
                 drawer,
@@ -98,7 +98,7 @@ impl View {
                     ..(self
                         .scroll_offset
                         .x
-                        .saturating_add(self.bounds.size.x as u64)),
+                        .saturating_add(math::f64_to_u64_clamp(self.bounds.size.x))),
                 self.highlight_info
                     .line_highlight(line_idx)
                     .unwrap_or(&Highlights::new()),
@@ -108,9 +108,9 @@ impl View {
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
         let screen_cursor_pos = Vec2u {
-            x: (self.bounds.pos.x as u64)
+            x: math::f64_to_u64_clamp(self.bounds.pos.x)
                 .saturating_add(grid_cursor_pos.x.saturating_sub(self.scroll_offset.x)),
-            y: (self.bounds.pos.y as u64)
+            y: math::f64_to_u64_clamp(self.bounds.pos.y)
                 .saturating_add(grid_cursor_pos.y.saturating_sub(self.scroll_offset.y)),
         };
 
@@ -135,12 +135,12 @@ impl View {
             >= self
                 .scroll_offset
                 .x
-                .saturating_add(self.bounds.size.x as u64)
+                .saturating_add(math::f64_to_u64_clamp(self.bounds.size.x))
         {
             self.scroll_offset.x = u64::from(
                 grid_cursor_pos
                     .x
-                    .saturating_sub(self.bounds.size.x as u64)
+                    .saturating_sub(math::f64_to_u64_clamp(self.bounds.size.x))
                     .saturating_add(1),
             );
         }
@@ -149,12 +149,12 @@ impl View {
             >= self
                 .scroll_offset
                 .y
-                .saturating_add(self.bounds.size.y as u64)
+                .saturating_add(math::f64_to_u64_clamp(self.bounds.size.y))
         {
             self.scroll_offset.y = u64::from(
                 grid_cursor_pos
                     .y
-                    .saturating_sub(self.bounds.size.y as u64)
+                    .saturating_sub(math::f64_to_u64_clamp(self.bounds.size.y))
                     .saturating_add(1),
             );
         }
@@ -327,14 +327,18 @@ impl View {
                 true
             }
             EditorCommand::MoveCursorUpOnePage => {
-                self.change_caret_y(self.caret_pos.y.saturating_sub(self.bounds.size.y as u64));
+                self.change_caret_y(
+                    self.caret_pos
+                        .y
+                        .saturating_sub(math::f64_to_u64_clamp(self.bounds.size.y)),
+                );
                 true
             }
             EditorCommand::MoveCursorDownOnePage => {
                 self.change_caret_y(
                     self.caret_pos
                         .y
-                        .saturating_add(self.bounds.size.y as u64)
+                        .saturating_add(math::f64_to_u64_clamp(self.bounds.size.y))
                         .clamp(0, self.buffer.get_total_lines().to_u64()),
                 );
                 true
