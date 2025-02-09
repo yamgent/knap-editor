@@ -11,17 +11,17 @@ pub struct Drawer {
 }
 
 enum DrawCommand {
-    DrawText {
+    Text {
         pos: Vec2f,
         text: String,
     },
-    DrawColoredText {
+    ColoredText {
         pos: Vec2f,
         text: String,
         foreground: Option<Color>,
         background: Option<Color>,
     },
-    DrawCursor {
+    Cursor {
         pos: Vec2f,
     },
 }
@@ -47,7 +47,7 @@ impl Drawer {
     }
 
     pub fn draw_text<T: AsRef<str>>(&mut self, pos: Vec2f, text: T) {
-        self.queue.push(DrawCommand::DrawText {
+        self.queue.push(DrawCommand::Text {
             pos,
             text: text.as_ref().to_string(),
         });
@@ -60,7 +60,7 @@ impl Drawer {
         foreground: Option<Color>,
         background: Option<Color>,
     ) {
-        self.queue.push(DrawCommand::DrawColoredText {
+        self.queue.push(DrawCommand::ColoredText {
             pos,
             text: text.as_ref().to_string(),
             foreground,
@@ -69,7 +69,7 @@ impl Drawer {
     }
 
     pub fn draw_cursor(&mut self, pos: Vec2f) {
-        self.queue.push(DrawCommand::DrawCursor { pos });
+        self.queue.push(DrawCommand::Cursor { pos });
     }
 
     pub fn clear(&mut self) {
@@ -84,10 +84,10 @@ impl Drawer {
         self.queue
             .drain(..)
             .map(|command| match command {
-                DrawCommand::DrawText { pos, text } => {
+                DrawCommand::Text { pos, text } => {
                     terminal::draw_text(convert_vec2f_to_terminal_pos(pos), text)
                 }
-                DrawCommand::DrawColoredText {
+                DrawCommand::ColoredText {
                     pos,
                     text,
                     foreground,
@@ -98,7 +98,7 @@ impl Drawer {
                     foreground.map(convert_color_to_crossterm_color),
                     background.map(convert_color_to_crossterm_color),
                 ),
-                DrawCommand::DrawCursor { pos } => {
+                DrawCommand::Cursor { pos } => {
                     final_cursor_pos = Some(pos);
                     Ok(())
                 }
