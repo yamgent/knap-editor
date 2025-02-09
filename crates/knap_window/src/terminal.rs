@@ -105,7 +105,7 @@ pub(crate) fn draw_colored_text<T: AsRef<str>>(
     Ok(())
 }
 
-pub fn set_title<T: AsRef<str>>(title: T) -> Result<()> {
+pub(crate) fn set_title<T: AsRef<str>>(title: T) -> Result<()> {
     queue!(io::stdout(), terminal::SetTitle(title.as_ref()))?;
     io::stdout().flush()?;
 

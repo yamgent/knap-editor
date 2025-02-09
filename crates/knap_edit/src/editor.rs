@@ -3,7 +3,7 @@ use std::panic;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use knap_base::math::{Bounds2f, Vec2f};
-use knap_window::{drawer::Drawer, terminal};
+use knap_window::{drawer::Drawer, terminal, window::Window};
 
 use crate::{
     buffer::Buffer,
@@ -26,6 +26,7 @@ fn setup_panic_hook() {
 
 pub struct Editor {
     should_quit: bool,
+    window: Window,
     drawer: Drawer,
 
     /// this is used to block the user if he tries to
@@ -86,6 +87,7 @@ impl Editor {
 
         Self {
             should_quit: false,
+            window: Window::new(),
             drawer: Drawer::new(),
             block_quit_remaining_tries: 0,
             view,
@@ -99,7 +101,9 @@ impl Editor {
         setup_panic_hook();
 
         terminal::init_terminal().expect("able to initialize terminal");
-        terminal::set_title("[No Name]").expect("able to set title");
+        self.window
+            .set_title("[No Name]")
+            .expect("able to set title");
 
         self.open_arg_file();
 
@@ -120,7 +124,7 @@ impl Editor {
                 }
             };
             self.view.replace_buffer(buffer);
-            terminal::set_title(&filename).expect("able to set title");
+            self.window.set_title(&filename).expect("able to set title");
         }
     }
 
@@ -154,7 +158,7 @@ impl Editor {
                 self.command_bar.clear_prompt();
                 if matches!(prompt, CommandBarPrompt::SaveAs) {
                     self.view.change_filename(&value);
-                    terminal::set_title(value).expect("able to set title");
+                    self.window.set_title(&value).expect("able to set title");
                     self.execute_command(EditorCommand::WriteBufferToDisk);
                 }
             }
