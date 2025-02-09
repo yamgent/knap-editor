@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileType {
+pub(crate) enum FileType {
     Rust,
     PlainText,
 }
@@ -24,7 +24,7 @@ fn deduce_filetype<T: AsRef<str>>(filename: T) -> FileType {
     }
 }
 
-pub struct Buffer {
+pub(crate) struct Buffer {
     content: Vec<TextLine>,
     filename: Option<String>,
     is_dirty: bool,
@@ -32,7 +32,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             content: vec![],
             filename: None,
@@ -41,7 +41,7 @@ impl Buffer {
         }
     }
 
-    pub fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
+    pub(crate) fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
         let content = std::fs::read_to_string(filename.as_ref())?;
 
         Ok(Self {
@@ -52,16 +52,16 @@ impl Buffer {
         })
     }
 
-    pub fn is_untitled_file(&self) -> bool {
+    pub(crate) fn is_untitled_file(&self) -> bool {
         self.filename.is_none()
     }
 
-    pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
+    pub(crate) fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.filename = Some(filename.as_ref().to_string());
         self.file_type = deduce_filetype(filename);
     }
 
-    pub fn write_to_disk(&mut self) -> Result<()> {
+    pub(crate) fn write_to_disk(&mut self) -> Result<()> {
         if let Some(filename) = &self.filename {
             let mut file = File::create(filename)?;
             self.content
@@ -75,37 +75,37 @@ impl Buffer {
         Ok(())
     }
 
-    pub fn get_filename(&self) -> Option<String> {
+    pub(crate) fn get_filename(&self) -> Option<String> {
         self.filename.clone()
     }
 
-    pub fn get_is_dirty(&self) -> bool {
+    pub(crate) fn get_is_dirty(&self) -> bool {
         self.is_dirty
     }
 
-    pub fn file_type(&self) -> FileType {
+    pub(crate) fn file_type(&self) -> FileType {
         self.file_type
     }
 
-    pub fn get_line_len(&self, line_idx: usize) -> usize {
+    pub(crate) fn get_line_len(&self, line_idx: usize) -> usize {
         self.content.get(line_idx).map_or(0, TextLine::get_line_len)
     }
 
-    pub fn get_line_text_width(&self, line_idx: usize, end_x: usize) -> u64 {
+    pub(crate) fn get_line_text_width(&self, line_idx: usize, end_x: usize) -> u64 {
         self.content
             .get(line_idx)
             .map_or(0, |line| line.get_line_text_width(end_x))
     }
 
-    pub fn get_total_lines(&self) -> usize {
+    pub(crate) fn get_total_lines(&self) -> usize {
         self.content.len()
     }
 
-    pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
+    pub(crate) fn get_raw_line(&self, line_idx: usize) -> Option<String> {
         self.content.get(line_idx).map(ToString::to_string)
     }
 
-    pub fn render_line(
+    pub(crate) fn render_line(
         &self,
         drawer: &mut Drawer,
         line_idx: usize,
@@ -119,7 +119,7 @@ impl Buffer {
         }
     }
 
-    pub fn insert_character(
+    pub(crate) fn insert_character(
         &mut self,
         line_idx: usize,
         fragment_idx: usize,
@@ -143,14 +143,14 @@ impl Buffer {
         }
     }
 
-    pub fn remove_character(&mut self, line_idx: usize, fragment_idx: usize) {
+    pub(crate) fn remove_character(&mut self, line_idx: usize, fragment_idx: usize) {
         if let Some(line) = self.content.get_mut(line_idx) {
             line.remove_character(fragment_idx);
             self.is_dirty = true;
         }
     }
 
-    pub fn join_line_with_below_line(&mut self, line_idx: usize) {
+    pub(crate) fn join_line_with_below_line(&mut self, line_idx: usize) {
         let mut new_line_string = None;
 
         if let Some(first_line) = self.content.get(line_idx) {
@@ -172,7 +172,7 @@ impl Buffer {
         }
     }
 
-    pub fn insert_newline_at(&mut self, line_idx: usize, fragment_idx: usize) {
+    pub(crate) fn insert_newline_at(&mut self, line_idx: usize, fragment_idx: usize) {
         assert!(line_idx <= self.content.len());
 
         match self.content.get_mut(line_idx) {
@@ -188,7 +188,7 @@ impl Buffer {
         self.is_dirty = true;
     }
 
-    pub fn find<T: AsRef<str>>(
+    pub(crate) fn find<T: AsRef<str>>(
         &self,
         search: T,
         start_pos: Vec2u,

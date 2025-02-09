@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum CommandBarPrompt {
+pub(crate) enum CommandBarPrompt {
     None,
     SaveAs,
     Search,
@@ -26,7 +26,7 @@ impl CommandBarPrompt {
 // TODO: This shares a lot of similar code with the multi-line View,
 // explore whether it is possible to share code between this and View
 // (or support single-line mode for View and use that).
-pub struct CommandBar {
+pub(crate) struct CommandBar {
     bounds: Bounds2f,
 
     prompt: CommandBarPrompt,
@@ -37,13 +37,13 @@ pub struct CommandBar {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct CommandBarExecuteResult {
+pub(crate) struct CommandBarExecuteResult {
     pub is_command_handled: bool,
     pub submitted_data: Option<(CommandBarPrompt, String)>,
 }
 
 impl CommandBar {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             bounds: Bounds2f::ZERO,
             prompt: CommandBarPrompt::None,
@@ -53,26 +53,26 @@ impl CommandBar {
         }
     }
 
-    pub fn set_bounds(&mut self, bounds: Bounds2f) {
+    pub(crate) fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
     }
 
-    pub fn clear_prompt(&mut self) {
+    pub(crate) fn clear_prompt(&mut self) {
         self.prompt = CommandBarPrompt::None;
         self.input = TextLine::new("");
         self.caret_pos = Vec2u::ZERO;
         self.scroll_offset = Vec2u::ZERO;
     }
 
-    pub fn set_prompt(&mut self, prompt: CommandBarPrompt) {
+    pub(crate) fn set_prompt(&mut self, prompt: CommandBarPrompt) {
         self.prompt = prompt;
     }
 
-    pub fn has_active_prompt(&self) -> bool {
+    pub(crate) fn has_active_prompt(&self) -> bool {
         !matches!(self.prompt, CommandBarPrompt::None)
     }
 
-    pub fn get_input_bounds(&self) -> Bounds2f {
+    pub(crate) fn get_input_bounds(&self) -> Bounds2f {
         let prompt = self.prompt.get_display();
         let prompt_len = prompt.chars().count() as f64;
         let input_start_x = self.bounds.pos.x + prompt_len;
@@ -90,7 +90,7 @@ impl CommandBar {
         }
     }
 
-    pub fn render(&self, drawer: &mut Drawer) {
+    pub(crate) fn render(&self, drawer: &mut Drawer) {
         if self.bounds.size.x * self.bounds.size.y > 0.0 {
             let prompt = self.prompt.get_display();
 
@@ -180,7 +180,7 @@ impl CommandBar {
 
     // splitting the function up doesn't change the readability much
     #[allow(clippy::too_many_lines)]
-    pub fn execute_command(
+    pub(crate) fn execute_command(
         &mut self,
         command: EditorCommand,
         message_bar: &mut MessageBar,

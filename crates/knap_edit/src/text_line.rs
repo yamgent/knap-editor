@@ -33,12 +33,12 @@ struct TextFragment {
     start_byte_index: usize,
 }
 
-pub struct TextLine {
+pub(crate) struct TextLine {
     fragments: Vec<TextFragment>,
     string: String,
 }
 
-pub struct InsertCharResult {
+pub(crate) struct InsertCharResult {
     /// There could be scenarios where an insertion of
     /// a new character results in grapheme clusters
     /// merging together. In those situations, the line
@@ -53,7 +53,7 @@ pub struct InsertCharResult {
 }
 
 #[derive(Debug)]
-pub enum InsertCharError {
+pub(crate) enum InsertCharError {
     InvalidPosition,
 }
 
@@ -116,18 +116,18 @@ fn build_fragments_from_string<T: AsRef<str>>(content: T) -> Vec<TextFragment> {
 }
 
 impl TextLine {
-    pub fn new<T: AsRef<str>>(content: T) -> Self {
+    pub(crate) fn new<T: AsRef<str>>(content: T) -> Self {
         Self {
             fragments: build_fragments_from_string(&content),
             string: content.as_ref().to_string(),
         }
     }
 
-    pub fn get_line_len(&self) -> usize {
+    pub(crate) fn get_line_len(&self) -> usize {
         self.fragments.len()
     }
 
-    pub fn get_line_text_width(&self, end_x: usize) -> u64 {
+    pub(crate) fn get_line_text_width(&self, end_x: usize) -> u64 {
         self.fragments
             .iter()
             .take(end_x)
@@ -138,7 +138,7 @@ impl TextLine {
     // TODO: Consider refactoring this in the future, so that we
     // do not have to disable too_many_lines lint
     #[allow(clippy::too_many_lines)]
-    pub fn render_line(
+    pub(crate) fn render_line(
         &self,
         drawer: &mut Drawer,
         screen_pos: Vec2f,
@@ -237,7 +237,7 @@ impl TextLine {
         }
     }
 
-    pub fn insert_character(
+    pub(crate) fn insert_character(
         &mut self,
         fragment_idx: usize,
         character: char,
@@ -269,7 +269,7 @@ impl TextLine {
         }
     }
 
-    pub fn remove_character(&mut self, fragment_idx: usize) {
+    pub(crate) fn remove_character(&mut self, fragment_idx: usize) {
         if fragment_idx < self.fragments.len() {
             let new_string = self
                 .fragments
@@ -283,7 +283,7 @@ impl TextLine {
     }
 
     #[must_use]
-    pub fn split_off(&mut self, fragment_idx: usize) -> Self {
+    pub(crate) fn split_off(&mut self, fragment_idx: usize) -> Self {
         let left = self
             .fragments
             .iter()
@@ -313,7 +313,7 @@ impl TextLine {
             .map(|fragment| fragment.start_byte_index)
     }
 
-    pub fn find<T: AsRef<str>>(
+    pub(crate) fn find<T: AsRef<str>>(
         &self,
         search: T,
         start_from_fragment_idx: Option<usize>,

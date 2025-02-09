@@ -11,7 +11,7 @@ use crate::{
     status_bar::ViewStatus,
 };
 
-pub struct View {
+pub(crate) struct View {
     bounds: Bounds2f,
 
     buffer: Buffer,
@@ -37,7 +37,7 @@ pub struct View {
 }
 
 impl View {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             buffer: Buffer::new(),
             bounds: Bounds2f::ZERO,
@@ -50,17 +50,17 @@ impl View {
         }
     }
 
-    pub fn replace_buffer(&mut self, buffer: Buffer) {
+    pub(crate) fn replace_buffer(&mut self, buffer: Buffer) {
         self.buffer = buffer;
         self.highlight_info.update_file_type(&self.buffer);
     }
 
-    pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
+    pub(crate) fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.buffer.change_filename(filename);
         self.highlight_info.update_file_type(&self.buffer);
     }
 
-    pub fn get_status(&self) -> ViewStatus {
+    pub(crate) fn get_status(&self) -> ViewStatus {
         ViewStatus {
             filename: self.buffer.get_filename(),
             total_lines: self.buffer.get_total_lines(),
@@ -79,12 +79,12 @@ impl View {
         }
     }
 
-    pub fn set_bounds(&mut self, bounds: Bounds2f) {
+    pub(crate) fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
         self.adjust_scroll_to_caret_grid_pos();
     }
 
-    pub fn render(&self, drawer: &mut Drawer) {
+    pub(crate) fn render(&self, drawer: &mut Drawer) {
         (0..(math::f64_to_u64_clamp(self.bounds.size.y))).for_each(|y| {
             let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
             self.buffer.render_line(
@@ -209,7 +209,7 @@ impl View {
         command_bar.set_prompt(CommandBarPrompt::Search);
     }
 
-    pub fn abort_search(&mut self) {
+    pub(crate) fn abort_search(&mut self) {
         self.caret_pos = self
             .before_search_caret_pos
             .take()
@@ -223,13 +223,13 @@ impl View {
         self.highlight_info.clear_search_highlights(&self.buffer);
     }
 
-    pub fn complete_search(&mut self) {
+    pub(crate) fn complete_search(&mut self) {
         self.before_search_caret_pos.take();
         self.before_search_scroll_offset.take();
         self.highlight_info.clear_search_highlights(&self.buffer);
     }
 
-    pub fn find<T: AsRef<str>>(
+    pub(crate) fn find<T: AsRef<str>>(
         &mut self,
         search: T,
         first_search: bool,
@@ -264,7 +264,7 @@ impl View {
 
     // splitting the function up doesn't change the readability much
     #[allow(clippy::too_many_lines)]
-    pub fn execute_command(
+    pub(crate) fn execute_command(
         &mut self,
         command: EditorCommand,
         message_bar: &mut MessageBar,

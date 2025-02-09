@@ -3,7 +3,7 @@ use knap_window::drawer::Drawer;
 
 use crate::buffer::FileType;
 
-pub struct ViewStatus {
+pub(crate) struct ViewStatus {
     pub filename: Option<String>,
     pub total_lines: usize,
     pub is_dirty: bool,
@@ -11,22 +11,22 @@ pub struct ViewStatus {
     pub file_type: FileType,
 }
 
-pub struct StatusBar {
+pub(crate) struct StatusBar {
     bounds: Bounds2f,
 }
 
 impl StatusBar {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             bounds: Bounds2f::ZERO,
         }
     }
 
-    pub fn set_bounds(&mut self, bounds: Bounds2f) {
+    pub(crate) fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
     }
 
-    pub fn render(&self, drawer: &mut Drawer, view_status: ViewStatus) {
+    pub(crate) fn render(&self, drawer: &mut Drawer, view_status: ViewStatus) {
         if self.bounds.size.x * self.bounds.size.y > 0.0 {
             let size_x = self.bounds.size.x as usize;
 

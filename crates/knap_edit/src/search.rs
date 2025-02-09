@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum SearchDirection {
+pub(crate) enum SearchDirection {
     Forward,
     Backward,
 }

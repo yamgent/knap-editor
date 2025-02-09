@@ -11,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::buffer::{Buffer, FileType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HighlightType {
+pub(crate) enum HighlightType {
     Number,
     SearchMatch,
     SearchCursor,
@@ -25,21 +25,21 @@ pub enum HighlightType {
     Comment,
 }
 
-pub struct Highlight {
+pub(crate) struct Highlight {
     highlight_type: HighlightType,
     range: Range<usize>,
 }
 
-pub struct Highlights {
+pub(crate) struct Highlights {
     highlights: Vec<Highlight>,
 }
 
 impl Highlights {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { highlights: vec![] }
     }
 
-    pub fn get_highlight_at(&self, byte_idx: usize) -> Option<HighlightType> {
+    pub(crate) fn get_highlight_at(&self, byte_idx: usize) -> Option<HighlightType> {
         self.highlights
             .iter()
             .find(|highlight| highlight.range.contains(&byte_idx))
@@ -47,7 +47,7 @@ impl Highlights {
     }
 }
 
-pub struct HighlightInfo {
+pub(crate) struct HighlightInfo {
     line_info: HashMap<usize, Highlights>,
     file_type: FileType,
 }
@@ -207,19 +207,19 @@ fn get_highlights_for_line<T: AsRef<str>>(
 }
 
 impl HighlightInfo {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             line_info: HashMap::new(),
             file_type: FileType::PlainText,
         }
     }
 
-    pub fn update_file_type(&mut self, buffer: &Buffer) {
+    pub(crate) fn update_file_type(&mut self, buffer: &Buffer) {
         self.file_type = buffer.file_type();
         self.regenerate_on_buffer_change(buffer);
     }
 
-    pub fn regenerate_on_search_change<T: AsRef<str>>(
+    pub(crate) fn regenerate_on_search_change<T: AsRef<str>>(
         &mut self,
         buffer: &Buffer,
         search_text: T,
@@ -247,7 +247,7 @@ impl HighlightInfo {
             .collect();
     }
 
-    pub fn regenerate_on_buffer_change(&mut self, buffer: &Buffer) {
+    pub(crate) fn regenerate_on_buffer_change(&mut self, buffer: &Buffer) {
         self.line_info = (0..buffer.get_total_lines())
             .filter_map(|line_idx| buffer.get_raw_line(line_idx))
             .map(|line| {
@@ -264,11 +264,11 @@ impl HighlightInfo {
             .collect();
     }
 
-    pub fn clear_search_highlights(&mut self, buffer: &Buffer) {
+    pub(crate) fn clear_search_highlights(&mut self, buffer: &Buffer) {
         self.regenerate_on_buffer_change(buffer);
     }
 
-    pub fn line_highlight(&self, line_idx: usize) -> Option<&Highlights> {
+    pub(crate) fn line_highlight(&self, line_idx: usize) -> Option<&Highlights> {
         self.line_info.get(&line_idx)
     }
 }
