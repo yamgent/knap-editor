@@ -51,7 +51,7 @@ pub(crate) fn end_draw() -> Result<()> {
     Ok(())
 }
 
-pub fn size_f64() -> Result<Vec2f> {
+pub(crate) fn size_f64() -> Result<Vec2f> {
     let size = terminal::size()?;
     Ok(Vec2f {
         x: size.0.into(),

@@ -7,9 +7,9 @@ pub struct MessageBar {
 }
 
 impl MessageBar {
-    pub fn new(bounds: Bounds2f) -> Self {
+    pub fn new() -> Self {
         Self {
-            bounds,
+            bounds: Bounds2f::ZERO,
             message: None,
         }
     }

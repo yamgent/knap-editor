@@ -16,8 +16,10 @@ pub struct StatusBar {
 }
 
 impl StatusBar {
-    pub fn new(bounds: Bounds2f) -> Self {
-        Self { bounds }
+    pub fn new() -> Self {
+        Self {
+            bounds: Bounds2f::ZERO,
+        }
     }
 
     pub fn set_bounds(&mut self, bounds: Bounds2f) {

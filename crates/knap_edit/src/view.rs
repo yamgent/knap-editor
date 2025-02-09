@@ -37,10 +37,10 @@ pub struct View {
 }
 
 impl View {
-    pub fn new(bounds: Bounds2f) -> Self {
+    pub fn new() -> Self {
         Self {
             buffer: Buffer::new(),
-            bounds,
+            bounds: Bounds2f::ZERO,
             caret_pos: Vec2u::ZERO,
             scroll_offset: Vec2u::ZERO,
             previous_line_caret_max_x: None,

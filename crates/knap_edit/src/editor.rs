@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use knap_base::math::{Bounds2f, Vec2f};
-use knap_window::{drawer::Drawer, terminal, window::Window};
+use knap_window::{drawer::Drawer, window::Window};
 
 use crate::{
     buffer::Buffer,
@@ -29,59 +29,15 @@ pub struct Editor {
 
 impl Editor {
     pub fn new() -> Self {
-        let terminal_size = terminal::size_f64().expect("able to get terminal size");
-
-        let view = View::new(Bounds2f {
-            pos: Vec2f::ZERO,
-            size: Vec2f {
-                x: terminal_size.x,
-                y: terminal_size.y - 2.0,
-            },
-        });
-
-        let status_bar = StatusBar::new(Bounds2f {
-            pos: Vec2f {
-                x: 0.0,
-                y: terminal_size.y - 2.0,
-            },
-            size: Vec2f {
-                x: terminal_size.x,
-                y: if terminal_size.y > 1.0 { 1.0 } else { 0.0 },
-            },
-        });
-
-        let mut message_bar = MessageBar::new(Bounds2f {
-            pos: Vec2f {
-                x: 0.0,
-                y: terminal_size.y - 1.0,
-            },
-            size: Vec2f {
-                x: terminal_size.x,
-                y: 1.0,
-            },
-        });
-        message_bar.set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
-
-        let command_bar = CommandBar::new(Bounds2f {
-            pos: Vec2f {
-                x: 0.0,
-                y: terminal_size.y - 1.0,
-            },
-            size: Vec2f {
-                x: terminal_size.x,
-                y: 1.0,
-            },
-        });
-
         Self {
             should_quit: false,
             window: Window::new(),
             drawer: Drawer::new(),
             block_quit_remaining_tries: 0,
-            view,
-            status_bar,
-            message_bar,
-            command_bar,
+            view: View::new(),
+            status_bar: StatusBar::new(),
+            message_bar: MessageBar::new(),
+            command_bar: CommandBar::new(),
         }
     }
 
@@ -90,6 +46,11 @@ impl Editor {
         self.window
             .set_title("[No Name]")
             .expect("able to set title");
+
+        let terminal_size = self.window.size();
+        self.handle_new_window_size(terminal_size);
+        self.message_bar
+            .set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
 
         self.open_arg_file();
 
@@ -163,6 +124,40 @@ impl Editor {
         }
     }
 
+    fn handle_new_window_size(&mut self, size: Vec2f) {
+        self.view.set_bounds(Bounds2f {
+            pos: Vec2f::ZERO,
+            size: Vec2f {
+                x: size.x,
+                y: size.y - 2.0,
+            },
+        });
+        self.status_bar.set_bounds(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: size.y - 2.0,
+            },
+            size: Vec2f {
+                x: size.x,
+                y: if size.y > 1.0 { 1.0 } else { 0.0 },
+            },
+        });
+        self.message_bar.set_bounds(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: size.y - 1.0,
+            },
+            size: Vec2f { x: size.x, y: 1.0 },
+        });
+        self.command_bar.set_bounds(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: size.y - 1.0,
+            },
+            size: Vec2f { x: size.x, y: 1.0 },
+        });
+    }
+
     fn handle_event(&mut self, event: &Event) -> bool {
         match event {
             Event::Key(KeyEvent {
@@ -228,37 +223,7 @@ impl Editor {
                     y: f64::from(*height),
                 };
 
-                self.view.set_bounds(Bounds2f {
-                    pos: Vec2f::ZERO,
-                    size: Vec2f {
-                        x: size.x,
-                        y: size.y - 2.0,
-                    },
-                });
-                self.status_bar.set_bounds(Bounds2f {
-                    pos: Vec2f {
-                        x: 0.0,
-                        y: size.y - 2.0,
-                    },
-                    size: Vec2f {
-                        x: size.x,
-                        y: if size.y > 1.0 { 1.0 } else { 0.0 },
-                    },
-                });
-                self.message_bar.set_bounds(Bounds2f {
-                    pos: Vec2f {
-                        x: 0.0,
-                        y: size.y - 1.0,
-                    },
-                    size: Vec2f { x: size.x, y: 1.0 },
-                });
-                self.command_bar.set_bounds(Bounds2f {
-                    pos: Vec2f {
-                        x: 0.0,
-                        y: size.y - 1.0,
-                    },
-                    size: Vec2f { x: size.x, y: 1.0 },
-                });
+                self.handle_new_window_size(size);
                 true
             }
             _ => false,

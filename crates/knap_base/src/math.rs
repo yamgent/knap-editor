@@ -34,6 +34,13 @@ pub struct Bounds2f {
     pub size: Vec2f,
 }
 
+impl Bounds2f {
+    pub const ZERO: Self = Self {
+        pos: Vec2f::ZERO,
+        size: Vec2f::ZERO,
+    };
+}
+
 pub trait ToUsizeClamp
 where
     Self: TryInto<usize>,

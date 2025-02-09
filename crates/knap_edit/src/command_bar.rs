@@ -43,9 +43,9 @@ pub struct CommandBarExecuteResult {
 }
 
 impl CommandBar {
-    pub fn new(bounds: Bounds2f) -> Self {
+    pub fn new() -> Self {
         Self {
-            bounds,
+            bounds: Bounds2f::ZERO,
             prompt: CommandBarPrompt::None,
             input: TextLine::new(""),
             caret_pos: Vec2u::ZERO,

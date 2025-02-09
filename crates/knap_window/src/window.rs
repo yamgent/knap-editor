@@ -1,6 +1,7 @@
 use std::panic;
 
 use anyhow::Result;
+use knap_base::math::Vec2f;
 
 use crate::terminal;
 
@@ -28,6 +29,10 @@ impl Window {
 
     pub fn deinit(&self) {
         terminal::end_terminal().expect("able to deinit terminal");
+    }
+
+    pub fn size(&self) -> Vec2f {
+        terminal::size_f64().expect("able to get terminal size")
     }
 
     pub fn set_title(&self, title: &str) -> Result<()> {
