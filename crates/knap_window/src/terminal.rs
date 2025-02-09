@@ -20,10 +20,6 @@ pub struct TerminalPos {
     pub y: u16,
 }
 
-pub struct TerminalRestoreState {
-    pub cursor_pos: TerminalPos,
-}
-
 pub fn init_terminal() -> Result<()> {
     terminal::enable_raw_mode()?;
 
@@ -43,19 +39,14 @@ pub fn end_terminal() -> Result<()> {
     Ok(())
 }
 
-pub fn start_draw() -> Result<TerminalRestoreState> {
+pub(crate) fn start_draw() -> Result<()> {
     queue!(io::stdout(), terminal::Clear(terminal::ClearType::All))?;
     hide_cursor()?;
 
-    Ok(TerminalRestoreState {
-        cursor_pos: get_cursor_pos()?,
-    })
+    Ok(())
 }
 
-pub fn end_draw(restore_state: &TerminalRestoreState) -> Result<()> {
-    move_cursor(restore_state.cursor_pos)?;
-    show_cursor()?;
-
+pub(crate) fn end_draw() -> Result<()> {
     io::stdout().flush()?;
     Ok(())
 }
@@ -68,17 +59,17 @@ pub fn size_f64() -> Result<Vec2f> {
     })
 }
 
-fn hide_cursor() -> Result<()> {
+pub(crate) fn hide_cursor() -> Result<()> {
     queue!(io::stdout(), cursor::Hide)?;
     Ok(())
 }
 
-fn show_cursor() -> Result<()> {
+pub(crate) fn show_cursor() -> Result<()> {
     queue!(io::stdout(), cursor::Show)?;
     Ok(())
 }
 
-fn move_cursor(pos: TerminalPos) -> Result<()> {
+pub(crate) fn move_cursor(pos: TerminalPos) -> Result<()> {
     queue!(io::stdout(), cursor::MoveTo(pos.x, pos.y))?;
     Ok(())
 }
@@ -112,11 +103,6 @@ pub(crate) fn draw_colored_text<T: AsRef<str>>(
     }
 
     Ok(())
-}
-
-fn get_cursor_pos() -> Result<TerminalPos> {
-    let pos = cursor::position()?;
-    Ok(TerminalPos { x: pos.0, y: pos.1 })
 }
 
 pub fn set_title<T: AsRef<str>>(title: T) -> Result<()> {

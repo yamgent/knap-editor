@@ -21,6 +21,9 @@ enum DrawCommand {
         foreground: Option<Color>,
         background: Option<Color>,
     },
+    DrawCursor {
+        pos: Vec2f,
+    },
 }
 
 fn convert_vec2f_to_terminal_pos(pos: Vec2f) -> TerminalPos {
@@ -65,7 +68,19 @@ impl Drawer {
         });
     }
 
+    pub fn draw_cursor(&mut self, pos: Vec2f) {
+        self.queue.push(DrawCommand::DrawCursor { pos });
+    }
+
+    pub fn clear(&mut self) {
+        self.queue.clear();
+    }
+
     pub fn present(&mut self) -> Result<()> {
+        terminal::start_draw()?;
+
+        let mut final_cursor_pos = None;
+
         self.queue
             .drain(..)
             .map(|command| match command {
@@ -83,9 +98,20 @@ impl Drawer {
                     foreground.map(convert_color_to_crossterm_color),
                     background.map(convert_color_to_crossterm_color),
                 ),
+                DrawCommand::DrawCursor { pos } => {
+                    final_cursor_pos = Some(pos);
+                    Ok(())
+                }
             })
             .find(Result::is_err)
             .unwrap_or(Ok(()))?;
+
+        if let Some(final_cursor_pos) = final_cursor_pos {
+            terminal::move_cursor(convert_vec2f_to_terminal_pos(final_cursor_pos))?;
+            terminal::show_cursor()?;
+        }
+
+        terminal::end_draw()?;
 
         Ok(())
     }

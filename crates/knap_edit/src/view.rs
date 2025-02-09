@@ -1,4 +1,3 @@
-use anyhow::Result;
 use knap_base::math::{Bounds2f, ToU16Clamp, ToU64, ToUsizeClamp, Vec2f, Vec2u};
 use knap_window::{drawer::Drawer, terminal::TerminalPos};
 
@@ -86,7 +85,7 @@ impl View {
         self.adjust_scroll_to_caret_grid_pos();
     }
 
-    pub fn render(&self, drawer: &mut Drawer) -> Result<TerminalPos> {
+    pub fn render(&self, drawer: &mut Drawer) {
         (0..(self.bounds.size.y as u64)).for_each(|y| {
             let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
             self.buffer.render_line(
@@ -122,7 +121,10 @@ impl View {
             ),
         };
 
-        Ok(screen_cursor_pos)
+        drawer.draw_cursor(Vec2f {
+            x: screen_cursor_pos.x as f64,
+            y: screen_cursor_pos.y as f64,
+        });
     }
 
     fn adjust_scroll_to_caret_grid_pos(&mut self) {

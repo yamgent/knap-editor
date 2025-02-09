@@ -1,4 +1,3 @@
-use anyhow::Result;
 use knap_base::math::Bounds2f;
 use knap_window::drawer::Drawer;
 
@@ -23,13 +22,11 @@ impl MessageBar {
         self.message = Some(message.as_ref().to_string());
     }
 
-    pub fn render(&self, drawer: &mut Drawer) -> Result<()> {
+    pub fn render(&self, drawer: &mut Drawer) {
         if self.bounds.size.x * self.bounds.size.y > 0.0 {
             if let Some(message) = &self.message {
                 drawer.draw_text(self.bounds.pos, message);
             }
         }
-
-        Ok(())
     }
 }

@@ -276,22 +276,19 @@ impl Editor {
     }
 
     fn draw(&mut self) -> Result<()> {
-        let mut state = terminal::start_draw()?;
+        self.drawer.clear();
 
-        let mut new_cursor_pos = self.view.render(&mut self.drawer)?;
+        self.view.render(&mut self.drawer);
         self.status_bar
-            .render(&mut self.drawer, self.view.get_status())?;
+            .render(&mut self.drawer, self.view.get_status());
 
         if self.command_bar.has_active_prompt() {
-            new_cursor_pos = self.command_bar.render(&mut self.drawer)?;
+            self.command_bar.render(&mut self.drawer);
         } else {
-            self.message_bar.render(&mut self.drawer)?;
+            self.message_bar.render(&mut self.drawer);
         }
 
-        state.cursor_pos = new_cursor_pos;
-
         self.drawer.present()?;
-        terminal::end_draw(&state)?;
         Ok(())
     }
 }

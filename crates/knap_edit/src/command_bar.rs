@@ -1,4 +1,3 @@
-use anyhow::Result;
 use knap_base::math::{self, Bounds2f, ToU16Clamp, ToU64, ToUsizeClamp, Vec2f, Vec2u};
 use knap_window::{drawer::Drawer, terminal::TerminalPos};
 
@@ -91,7 +90,7 @@ impl CommandBar {
         }
     }
 
-    pub fn render(&self, drawer: &mut Drawer) -> Result<TerminalPos> {
+    pub fn render(&self, drawer: &mut Drawer) {
         if self.bounds.size.x * self.bounds.size.y > 0.0 {
             let prompt = self.prompt.get_display();
 
@@ -115,7 +114,7 @@ impl CommandBar {
 
             let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-            Ok(TerminalPos {
+            let screen_cursor_pos = TerminalPos {
                 x: math::f64_to_u16_clamp(input_bounds.pos.x).saturating_add(
                     grid_cursor_pos
                         .x
@@ -126,12 +125,12 @@ impl CommandBar {
                         .y
                         .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
                 ),
-            })
-        } else {
-            Ok(TerminalPos {
-                x: math::f64_to_u16_clamp(self.bounds.pos.x),
-                y: math::f64_to_u16_clamp(self.bounds.pos.y),
-            })
+            };
+
+            drawer.draw_cursor(Vec2f {
+                x: screen_cursor_pos.x as f64,
+                y: screen_cursor_pos.y as f64,
+            });
         }
     }
 
