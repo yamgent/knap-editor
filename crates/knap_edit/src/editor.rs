@@ -1,5 +1,3 @@
-use std::panic;
-
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use knap_base::math::{Bounds2f, Vec2f};
@@ -13,16 +11,6 @@ use crate::{
     status_bar::StatusBar,
     view::View,
 };
-
-fn setup_panic_hook() {
-    let current_hook = panic::take_hook();
-    panic::set_hook(Box::new(move |panic_info| {
-        // we can't do anything to recover if end_terminal returns an error,
-        // so just ignore the Result
-        let _ = terminal::end_terminal();
-        current_hook(panic_info);
-    }));
-}
 
 pub struct Editor {
     should_quit: bool,
@@ -98,9 +86,7 @@ impl Editor {
     }
 
     pub fn run(&mut self) {
-        setup_panic_hook();
-
-        terminal::init_terminal().expect("able to initialize terminal");
+        self.window.init();
         self.window
             .set_title("[No Name]")
             .expect("able to set title");
@@ -109,7 +95,7 @@ impl Editor {
 
         let repl_result = self.repl();
 
-        terminal::end_terminal().expect("able to deinit terminal");
+        self.window.deinit();
         repl_result.expect("repl has no fatal error");
     }
 

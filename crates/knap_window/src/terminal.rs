@@ -20,7 +20,7 @@ pub struct TerminalPos {
     pub y: u16,
 }
 
-pub fn init_terminal() -> Result<()> {
+pub(crate) fn init_terminal() -> Result<()> {
     terminal::enable_raw_mode()?;
 
     queue!(io::stdout(), terminal::EnterAlternateScreen)?;
@@ -30,7 +30,7 @@ pub fn init_terminal() -> Result<()> {
     Ok(())
 }
 
-pub fn end_terminal() -> Result<()> {
+pub(crate) fn end_terminal() -> Result<()> {
     queue!(io::stdout(), terminal::EnableLineWrap)?;
     queue!(io::stdout(), terminal::LeaveAlternateScreen)?;
     io::stdout().flush()?;
