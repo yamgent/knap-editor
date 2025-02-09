@@ -1,5 +1,5 @@
-use knap_base::math::{Bounds2f, ToU16Clamp, ToU64, ToUsizeClamp, Vec2f, Vec2u};
-use knap_window::{drawer::Drawer, terminal::TerminalPos};
+use knap_base::math::{Bounds2f, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_window::drawer::Drawer;
 
 use crate::{
     buffer::Buffer,
@@ -70,13 +70,12 @@ impl View {
         }
     }
 
-    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> TerminalPos {
-        TerminalPos {
+    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> Vec2u {
+        Vec2u {
             x: self
                 .buffer
-                .get_line_text_width(caret_pos.y.to_usize_clamp(), caret_pos.x.to_usize_clamp())
-                .to_u16_clamp(),
-            y: caret_pos.y.to_u16_clamp(),
+                .get_line_text_width(caret_pos.y.to_usize_clamp(), caret_pos.x.to_usize_clamp()),
+            y: caret_pos.y,
         }
     }
 
@@ -108,17 +107,11 @@ impl View {
 
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        let screen_cursor_pos = TerminalPos {
-            x: (self.bounds.pos.x as u16).saturating_add(
-                grid_cursor_pos
-                    .x
-                    .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
-            ),
-            y: (self.bounds.pos.y as u16).saturating_add(
-                grid_cursor_pos
-                    .y
-                    .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
-            ),
+        let screen_cursor_pos = Vec2u {
+            x: (self.bounds.pos.x as u64)
+                .saturating_add(grid_cursor_pos.x.saturating_sub(self.scroll_offset.x)),
+            y: (self.bounds.pos.y as u64)
+                .saturating_add(grid_cursor_pos.y.saturating_sub(self.scroll_offset.y)),
         };
 
         drawer.draw_cursor(Vec2f {
@@ -130,11 +123,11 @@ impl View {
     fn adjust_scroll_to_caret_grid_pos(&mut self) {
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        if grid_cursor_pos.x < self.scroll_offset.x.to_u16_clamp() {
+        if grid_cursor_pos.x < self.scroll_offset.x {
             self.scroll_offset.x = u64::from(grid_cursor_pos.x);
         }
 
-        if grid_cursor_pos.y < self.scroll_offset.y.to_u16_clamp() {
+        if grid_cursor_pos.y < self.scroll_offset.y {
             self.scroll_offset.y = u64::from(grid_cursor_pos.y);
         }
 
@@ -143,12 +136,11 @@ impl View {
                 .scroll_offset
                 .x
                 .saturating_add(self.bounds.size.x as u64)
-                .to_u16_clamp()
         {
             self.scroll_offset.x = u64::from(
                 grid_cursor_pos
                     .x
-                    .saturating_sub(self.bounds.size.x as u16)
+                    .saturating_sub(self.bounds.size.x as u64)
                     .saturating_add(1),
             );
         }
@@ -158,12 +150,11 @@ impl View {
                 .scroll_offset
                 .y
                 .saturating_add(self.bounds.size.y as u64)
-                .to_u16_clamp()
         {
             self.scroll_offset.y = u64::from(
                 grid_cursor_pos
                     .y
-                    .saturating_sub(self.bounds.size.y as u16)
+                    .saturating_sub(self.bounds.size.y as u64)
                     .saturating_add(1),
             );
         }

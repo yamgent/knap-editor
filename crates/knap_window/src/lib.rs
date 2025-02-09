@@ -1,3 +1,3 @@
 pub mod drawer;
-pub mod terminal;
+mod terminal;
 pub mod window;

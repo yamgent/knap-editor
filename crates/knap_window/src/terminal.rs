@@ -9,7 +9,7 @@ use crossterm::{
 use knap_base::math::Vec2f;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
-pub struct TerminalPos {
+pub(crate) struct TerminalPos {
     pub x: u16,
     pub y: u16,
 }

@@ -1,5 +1,5 @@
-use knap_base::math::{self, Bounds2f, ToU16Clamp, ToU64, ToUsizeClamp, Vec2f, Vec2u};
-use knap_window::{drawer::Drawer, terminal::TerminalPos};
+use knap_base::math::{Bounds2f, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_window::drawer::Drawer;
 
 use crate::{
     commands::EditorCommand, highlighter::Highlights, message_bar::MessageBar,
@@ -114,17 +114,11 @@ impl CommandBar {
 
             let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-            let screen_cursor_pos = TerminalPos {
-                x: math::f64_to_u16_clamp(input_bounds.pos.x).saturating_add(
-                    grid_cursor_pos
-                        .x
-                        .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
-                ),
-                y: math::f64_to_u16_clamp(input_bounds.pos.y).saturating_add(
-                    grid_cursor_pos
-                        .y
-                        .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
-                ),
+            let screen_cursor_pos = Vec2u {
+                x: (input_bounds.pos.x as u64)
+                    .saturating_add(grid_cursor_pos.x.saturating_sub(self.scroll_offset.x)),
+                y: (input_bounds.pos.y as u64)
+                    .saturating_add(grid_cursor_pos.y.saturating_sub(self.scroll_offset.y)),
             };
 
             drawer.draw_cursor(Vec2f {
@@ -134,20 +128,17 @@ impl CommandBar {
         }
     }
 
-    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> TerminalPos {
-        TerminalPos {
-            x: self
-                .input
-                .get_line_text_width(caret_pos.x.to_usize_clamp())
-                .to_u16_clamp(),
-            y: caret_pos.y.to_u16_clamp(),
+    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> Vec2u {
+        Vec2u {
+            x: self.input.get_line_text_width(caret_pos.x.to_usize_clamp()),
+            y: caret_pos.y,
         }
     }
 
     fn adjust_scroll_to_caret_grid_pos(&mut self) {
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        if grid_cursor_pos.x < self.scroll_offset.x.to_u16_clamp() {
+        if grid_cursor_pos.x < self.scroll_offset.x {
             self.scroll_offset.x = u64::from(grid_cursor_pos.x);
         }
 
@@ -158,12 +149,11 @@ impl CommandBar {
                 .scroll_offset
                 .x
                 .saturating_add(input_bounds.size.x as u64)
-                .to_u16_clamp()
         {
             self.scroll_offset.x = u64::from(
                 grid_cursor_pos
                     .x
-                    .saturating_sub(input_bounds.size.x as u16)
+                    .saturating_sub(input_bounds.size.x as u64)
                     .saturating_add(1),
             );
         }
