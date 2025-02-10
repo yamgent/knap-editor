@@ -1,4 +1,4 @@
-use knap_base::math::{self, Bounds2f, Lossy, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_base::math::{self, Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -130,7 +130,7 @@ impl CommandBar {
 
     fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> Vec2u {
         Vec2u {
-            x: self.input.get_line_text_width(caret_pos.x.to_usize_clamp()),
+            x: self.input.get_line_text_width(caret_pos.x.to_usize()),
             y: caret_pos.y,
         }
     }
@@ -251,10 +251,7 @@ impl CommandBar {
                 }
             }
             EditorCommand::InsertCharacter(ch) => {
-                match self
-                    .input
-                    .insert_character(self.caret_pos.x.to_usize_clamp(), ch)
-                {
+                match self.input.insert_character(self.caret_pos.x.to_usize(), ch) {
                     Ok(result) => {
                         if result.line_len_increased {
                             self.change_caret_x(self.caret_pos.x.saturating_add(1));
@@ -288,7 +285,7 @@ impl CommandBar {
             EditorCommand::EraseCharacterBeforeCursor => {
                 if self.caret_pos.x > 0 {
                     self.input
-                        .remove_character(self.caret_pos.x.saturating_sub(1).to_usize_clamp());
+                        .remove_character(self.caret_pos.x.saturating_sub(1).to_usize());
 
                     self.change_caret_x(self.caret_pos.x.saturating_sub(1));
                     self.on_input_updated(view);
@@ -300,8 +297,7 @@ impl CommandBar {
             }
             EditorCommand::EraseCharacterAfterCursor => {
                 if self.caret_pos.x < self.input.get_line_len().to_u64() {
-                    self.input
-                        .remove_character(self.caret_pos.x.to_usize_clamp());
+                    self.input.remove_character(self.caret_pos.x.to_usize());
                     self.on_input_updated(view);
                 }
                 CommandBarExecuteResult {

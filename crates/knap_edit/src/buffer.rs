@@ -1,7 +1,7 @@
 use std::{fs::File, io::Write, ops::Range};
 
 use anyhow::Result;
-use knap_base::math::{ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_base::math::{ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -194,13 +194,9 @@ impl Buffer {
         start_pos: Vec2u,
         search_direction: SearchDirection,
     ) -> Option<Vec2u> {
-        if let Some(first_line) = self.content.get(start_pos.y.to_usize_clamp()) {
+        if let Some(first_line) = self.content.get(start_pos.y.to_usize()) {
             let first_line_result = first_line
-                .find(
-                    &search,
-                    Some(start_pos.x.to_usize_clamp()),
-                    search_direction,
-                )
+                .find(&search, Some(start_pos.x.to_usize()), search_direction)
                 .map(|fragment_idx| Vec2u {
                     x: fragment_idx.to_u64(),
                     y: start_pos.y,
@@ -217,7 +213,7 @@ impl Buffer {
                 .iter()
                 .enumerate()
                 .cycle()
-                .skip(start_pos.y.saturating_add(1).to_usize_clamp())
+                .skip(start_pos.y.saturating_add(1).to_usize())
                 .take(self.content.len().saturating_sub(1))
                 .find_map(|(line_idx, line)| {
                     line.find(&search, None, search_direction)
@@ -232,11 +228,7 @@ impl Buffer {
                 .enumerate()
                 .rev()
                 .cycle()
-                .skip(
-                    self.content
-                        .len()
-                        .saturating_sub(start_pos.y.to_usize_clamp()),
-                )
+                .skip(self.content.len().saturating_sub(start_pos.y.to_usize()))
                 .take(self.content.len().saturating_sub(1))
                 .find_map(|(line_idx, line)| {
                     line.find(&search, None, search_direction)

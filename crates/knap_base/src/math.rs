@@ -41,20 +41,6 @@ impl Bounds2f {
     };
 }
 
-pub trait ToUsizeClamp
-where
-    Self: TryInto<usize>,
-{
-    /// This is used to get rid of the `clippy::cast_possible_truncation`
-    /// lint error, as `Self` may have more bits than `usize`. When that happens,
-    /// then we clamp the value to `usize::MAX`
-    fn to_usize_clamp(self) -> usize {
-        self.try_into().unwrap_or(usize::MAX)
-    }
-}
-
-impl ToUsizeClamp for u64 {}
-
 pub trait ToU16Clamp
 where
     Self: TryInto<u16>,
@@ -114,10 +100,26 @@ pub trait ToU64 {
 
 impl ToU64 for usize {
     fn to_u64(self) -> u64 {
-        assert!(std::mem::size_of::<usize>() == 8);
+        debug_assert!(std::mem::size_of::<usize>() == 8);
 
         #[allow(clippy::as_conversions)]
         let result = self as u64;
+
+        result
+    }
+}
+
+pub trait ToUsize {
+    fn to_usize(self) -> usize;
+}
+
+impl ToUsize for u64 {
+    fn to_usize(self) -> usize {
+        debug_assert!(std::mem::size_of::<usize>() == 8);
+
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::as_conversions)]
+        let result = self as usize;
 
         result
     }
@@ -161,6 +163,16 @@ impl Lossy<usize> for f64 {
         #[allow(clippy::cast_sign_loss)]
         #[allow(clippy::as_conversions)]
         let result = *self as usize;
+        result
+    }
+}
+
+impl Lossy<u64> for f64 {
+    fn lossy(&self) -> u64 {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as u64;
         result
     }
 }

@@ -4,7 +4,7 @@ use std::{
     ops::Range,
 };
 
-use knap_base::math::{ToUsizeClamp, Vec2u};
+use knap_base::math::{ToUsize, Vec2u};
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -99,7 +99,7 @@ fn get_highlights_for_line<T: AsRef<str>>(
             .match_indices(search_text)
             .map(|entries| Highlight {
                 highlight_type: if search_cursor_x_pos.is_some()
-                    && entries.0 == search_cursor_x_pos.unwrap_or_default().to_usize_clamp()
+                    && entries.0 == search_cursor_x_pos.unwrap_or_default().to_usize()
                 {
                     HighlightType::SearchCursor
                 } else {
@@ -229,7 +229,7 @@ impl HighlightInfo {
             .filter_map(|line_idx| buffer.get_raw_line(line_idx))
             .enumerate()
             .map(|(line_idx, line)| {
-                let search_cursor_x_pos = if line_idx == search_cursor_pos.y.to_usize_clamp() {
+                let search_cursor_x_pos = if line_idx == search_cursor_pos.y.to_usize() {
                     Some(search_cursor_pos.x)
                 } else {
                     None

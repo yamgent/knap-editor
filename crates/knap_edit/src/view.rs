@@ -1,4 +1,4 @@
-use knap_base::math::{self, Bounds2f, Lossy, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_base::math::{self, Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -74,7 +74,7 @@ impl View {
         Vec2u {
             x: self
                 .buffer
-                .get_line_text_width(caret_pos.y.to_usize_clamp(), caret_pos.x.to_usize_clamp()),
+                .get_line_text_width(caret_pos.y.to_usize(), caret_pos.x.to_usize()),
             y: caret_pos.y,
         }
     }
@@ -86,7 +86,7 @@ impl View {
 
     pub(crate) fn render(&self, drawer: &mut Drawer) {
         (0..(math::f64_to_u64_clamp(self.bounds.size.y))).for_each(|y| {
-            let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
+            let line_idx = self.scroll_offset.y.saturating_add(y).to_usize();
             self.buffer.render_line(
                 drawer,
                 line_idx,
@@ -161,7 +161,7 @@ impl View {
     fn adjust_caret_x_on_caret_y_movement(&mut self) {
         let line_len = self
             .buffer
-            .get_line_len(self.caret_pos.y.to_usize_clamp())
+            .get_line_len(self.caret_pos.y.to_usize())
             .to_u64();
 
         if self.caret_pos.x > line_len {
@@ -290,7 +290,7 @@ impl View {
                         self.change_caret_xy(Vec2u {
                             x: self
                                 .buffer
-                                .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize_clamp())
+                                .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                                 .to_u64(),
                             y: self.caret_pos.y.saturating_sub(1),
                         });
@@ -305,7 +305,7 @@ impl View {
             EditorCommand::MoveCursorRight => {
                 let line_len = self
                     .buffer
-                    .get_line_len(self.caret_pos.y.to_usize_clamp())
+                    .get_line_len(self.caret_pos.y.to_usize())
                     .to_u64();
 
                 if self.caret_pos.x == line_len {
@@ -346,15 +346,15 @@ impl View {
             EditorCommand::MoveCursorToEndOfLine => {
                 self.change_caret_x(
                     self.buffer
-                        .get_line_len(self.caret_pos.y.to_usize_clamp())
+                        .get_line_len(self.caret_pos.y.to_usize())
                         .to_u64(),
                 );
                 true
             }
             EditorCommand::InsertCharacter(ch) => {
                 match self.buffer.insert_character(
-                    self.caret_pos.y.to_usize_clamp(),
-                    self.caret_pos.x.to_usize_clamp(),
+                    self.caret_pos.y.to_usize(),
+                    self.caret_pos.x.to_usize(),
                     ch,
                 ) {
                     Ok(result) => {
@@ -371,8 +371,8 @@ impl View {
             EditorCommand::EraseCharacterBeforeCursor => {
                 if self.caret_pos.x > 0 {
                     self.buffer.remove_character(
-                        self.caret_pos.y.to_usize_clamp(),
-                        self.caret_pos.x.saturating_sub(1).to_usize_clamp(),
+                        self.caret_pos.y.to_usize(),
+                        self.caret_pos.x.saturating_sub(1).to_usize(),
                     );
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
@@ -381,12 +381,11 @@ impl View {
                 } else if self.caret_pos.y > 0 {
                     let previous_line_len = self
                         .buffer
-                        .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize_clamp())
+                        .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                         .to_u64();
 
-                    self.buffer.join_line_with_below_line(
-                        self.caret_pos.y.saturating_sub(1).to_usize_clamp(),
-                    );
+                    self.buffer
+                        .join_line_with_below_line(self.caret_pos.y.saturating_sub(1).to_usize());
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
 
@@ -403,18 +402,16 @@ impl View {
                 if self.caret_pos.x
                     < self
                         .buffer
-                        .get_line_len(self.caret_pos.y.to_usize_clamp())
+                        .get_line_len(self.caret_pos.y.to_usize())
                         .to_u64()
                 {
-                    self.buffer.remove_character(
-                        self.caret_pos.y.to_usize_clamp(),
-                        self.caret_pos.x.to_usize_clamp(),
-                    );
+                    self.buffer
+                        .remove_character(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
                 } else if self.caret_pos.y < self.buffer.get_total_lines().to_u64() {
                     self.buffer
-                        .join_line_with_below_line(self.caret_pos.y.to_usize_clamp());
+                        .join_line_with_below_line(self.caret_pos.y.to_usize());
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
                 }
@@ -424,10 +421,8 @@ impl View {
             }
 
             EditorCommand::InsertNewline => {
-                self.buffer.insert_newline_at(
-                    self.caret_pos.y.to_usize_clamp(),
-                    self.caret_pos.x.to_usize_clamp(),
-                );
+                self.buffer
+                    .insert_newline_at(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
                 self.highlight_info
                     .regenerate_on_buffer_change(&self.buffer);
                 self.change_caret_xy(Vec2u {
