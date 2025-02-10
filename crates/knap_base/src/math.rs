@@ -35,26 +35,6 @@ impl Bounds2f {
     };
 }
 
-pub fn f64_to_u64_clamp(value: f64) -> u64 {
-    if value.is_finite() {
-        if value <= 0.0 {
-            0
-        } else {
-            // unlike `f64_to_u16_clamp()`, we cannot check `u64::MAX` here,
-            // because `u64::MAX as f64` is bigger than `u64::MAX`.
-            // `value as u64` will already truncate the value, so we don't
-            // need to check `u64::MAX` here.
-            #[allow(clippy::cast_possible_truncation)]
-            #[allow(clippy::cast_sign_loss)]
-            #[allow(clippy::as_conversions)]
-            let result = value as u64;
-            result
-        }
-    } else {
-        0
-    }
-}
-
 pub trait ToU64 {
     fn to_u64(self) -> u64;
 }

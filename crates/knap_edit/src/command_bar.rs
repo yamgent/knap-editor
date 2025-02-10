@@ -1,4 +1,4 @@
-use knap_base::math::{self, Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
+use knap_base::math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -108,16 +108,16 @@ impl CommandBar {
                     ..(self
                         .scroll_offset
                         .x
-                        .saturating_add(math::f64_to_u64_clamp(input_bounds.size.x))),
+                        .saturating_add(input_bounds.size.x.lossy())),
                 &Highlights::new(),
             );
 
             let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
             let screen_cursor_pos = Vec2u {
-                x: math::f64_to_u64_clamp(input_bounds.pos.x)
+                x: <f64 as Lossy<u64>>::lossy(&input_bounds.pos.x)
                     .saturating_add(grid_cursor_pos.x.saturating_sub(self.scroll_offset.x)),
-                y: math::f64_to_u64_clamp(input_bounds.pos.y)
+                y: <f64 as Lossy<u64>>::lossy(&input_bounds.pos.y)
                     .saturating_add(grid_cursor_pos.y.saturating_sub(self.scroll_offset.y)),
             };
 
@@ -148,11 +148,11 @@ impl CommandBar {
             >= self
                 .scroll_offset
                 .x
-                .saturating_add(math::f64_to_u64_clamp(input_bounds.size.x))
+                .saturating_add(input_bounds.size.x.lossy())
         {
             self.scroll_offset.x = grid_cursor_pos
                 .x
-                .saturating_sub(math::f64_to_u64_clamp(input_bounds.size.x))
+                .saturating_sub(input_bounds.size.x.lossy())
                 .saturating_add(1);
         }
     }
