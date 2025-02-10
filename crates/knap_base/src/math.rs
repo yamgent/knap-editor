@@ -122,3 +122,45 @@ impl ToU64 for usize {
         result
     }
 }
+
+/// Allow conversion from a numeric type to another type,
+/// with the loss of precision accepted.
+///
+/// Note that most of the time, this indicates that an API is
+/// poorly designed. However, there could be situations where
+/// the API design is beyond our control, and for those instances,
+/// using `Lossy` is an acceptable alternative.
+///
+/// Most implementation of `Lossy` follows the behaviour as described
+/// in [`as` documentation](https://doc.rust-lang.org/nightly/reference/expressions/operator-expr.html#semantics).
+pub trait Lossy<U> {
+    fn lossy(&self) -> U;
+}
+
+impl Lossy<f64> for usize {
+    fn lossy(&self) -> f64 {
+        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as f64;
+        result
+    }
+}
+
+impl Lossy<f64> for u64 {
+    fn lossy(&self) -> f64 {
+        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as f64;
+        result
+    }
+}
+
+impl Lossy<usize> for f64 {
+    fn lossy(&self) -> usize {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as usize;
+        result
+    }
+}

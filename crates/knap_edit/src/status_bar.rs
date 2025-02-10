@@ -1,4 +1,4 @@
-use knap_base::math::{Bounds2f, Vec2u};
+use knap_base::math::{Bounds2f, Lossy, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::buffer::FileType;
@@ -28,7 +28,7 @@ impl StatusBar {
 
     pub(crate) fn render(&self, drawer: &mut Drawer, view_status: ViewStatus) {
         if self.bounds.size.x * self.bounds.size.y > 0.0 {
-            let size_x = self.bounds.size.x as usize;
+            let size_x = self.bounds.size.x.lossy();
 
             let left = format!(
                 "{} - {} lines {}",

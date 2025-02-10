@@ -1,4 +1,4 @@
-use knap_base::math::{self, Bounds2f, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_base::math::{self, Bounds2f, Lossy, ToU64, ToUsizeClamp, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -74,7 +74,7 @@ impl CommandBar {
 
     pub(crate) fn get_input_bounds(&self) -> Bounds2f {
         let prompt = self.prompt.get_display();
-        let prompt_len = prompt.chars().count() as f64;
+        let prompt_len = prompt.chars().count().lossy();
         let input_start_x = self.bounds.pos.x + prompt_len;
         let input_size_x = self.bounds.size.x - prompt_len;
 
@@ -122,8 +122,8 @@ impl CommandBar {
             };
 
             drawer.draw_cursor(Vec2f {
-                x: screen_cursor_pos.x as f64,
-                y: screen_cursor_pos.y as f64,
+                x: screen_cursor_pos.x.lossy(),
+                y: screen_cursor_pos.y.lossy(),
             });
         }
     }
@@ -139,7 +139,7 @@ impl CommandBar {
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
         if grid_cursor_pos.x < self.scroll_offset.x {
-            self.scroll_offset.x = u64::from(grid_cursor_pos.x);
+            self.scroll_offset.x = grid_cursor_pos.x;
         }
 
         let input_bounds = self.get_input_bounds();
@@ -150,12 +150,10 @@ impl CommandBar {
                 .x
                 .saturating_add(math::f64_to_u64_clamp(input_bounds.size.x))
         {
-            self.scroll_offset.x = u64::from(
-                grid_cursor_pos
-                    .x
-                    .saturating_sub(math::f64_to_u64_clamp(input_bounds.size.x))
-                    .saturating_add(1),
-            );
+            self.scroll_offset.x = grid_cursor_pos
+                .x
+                .saturating_sub(math::f64_to_u64_clamp(input_bounds.size.x))
+                .saturating_add(1);
         }
     }
 

@@ -1,4 +1,4 @@
-use knap_base::math::{self, Bounds2f, ToU64, ToUsizeClamp, Vec2f, Vec2u};
+use knap_base::math::{self, Bounds2f, Lossy, ToU64, ToUsizeClamp, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -92,7 +92,7 @@ impl View {
                 line_idx,
                 Vec2f {
                     x: self.bounds.pos.x,
-                    y: self.bounds.pos.y + y as f64,
+                    y: self.bounds.pos.y + y.lossy(),
                 },
                 self.scroll_offset.x
                     ..(self
@@ -115,8 +115,8 @@ impl View {
         };
 
         drawer.draw_cursor(Vec2f {
-            x: screen_cursor_pos.x as f64,
-            y: screen_cursor_pos.y as f64,
+            x: screen_cursor_pos.x.lossy(),
+            y: screen_cursor_pos.y.lossy(),
         });
     }
 

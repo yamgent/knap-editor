@@ -1,7 +1,10 @@
 use std::{error::Error, fmt::Display, ops::Range};
 
 use anyhow::Result;
-use knap_base::{color::Color, math::Vec2f};
+use knap_base::{
+    color::Color,
+    math::{Lossy, Vec2f},
+};
 use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -223,7 +226,7 @@ impl TextLine {
 
                     drawer.draw_colored_text(
                         Vec2f {
-                            x: screen_pos.x + x_offset as f64,
+                            x: screen_pos.x + x_offset.lossy(),
                             y: screen_pos.y,
                         },
                         string,
