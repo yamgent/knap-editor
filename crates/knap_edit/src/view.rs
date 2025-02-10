@@ -102,7 +102,7 @@ impl View {
                 self.highlight_info
                     .line_highlight(line_idx)
                     .unwrap_or(&Highlights::new()),
-            )
+            );
         });
 
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
