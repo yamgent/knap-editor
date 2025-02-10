@@ -1,7 +1,7 @@
 use anyhow::Result;
 use knap_base::{
     color::Color,
-    math::{self, Vec2f},
+    math::{Lossy, Vec2f},
 };
 
 use crate::terminal::{self, TerminalPos};
@@ -28,8 +28,8 @@ enum DrawCommand {
 
 fn convert_vec2f_to_terminal_pos(pos: Vec2f) -> TerminalPos {
     TerminalPos {
-        x: math::f64_to_u16_clamp(pos.x),
-        y: math::f64_to_u16_clamp(pos.y),
+        x: pos.x.lossy(),
+        y: pos.y.lossy(),
     }
 }
 

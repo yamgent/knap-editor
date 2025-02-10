@@ -35,24 +35,6 @@ impl Bounds2f {
     };
 }
 
-pub fn f64_to_u16_clamp(value: f64) -> u16 {
-    if value.is_finite() {
-        if value <= 0.0 {
-            0
-        } else if value >= u16::MAX.into() {
-            u16::MAX
-        } else {
-            #[allow(clippy::cast_possible_truncation)]
-            #[allow(clippy::cast_sign_loss)]
-            #[allow(clippy::as_conversions)]
-            let result = value as u16;
-            result
-        }
-    } else {
-        0
-    }
-}
-
 pub fn f64_to_u64_clamp(value: f64) -> u64 {
     if value.is_finite() {
         if value <= 0.0 {
@@ -142,6 +124,16 @@ impl Lossy<usize> for f64 {
         #[allow(clippy::cast_sign_loss)]
         #[allow(clippy::as_conversions)]
         let result = *self as usize;
+        result
+    }
+}
+
+impl Lossy<u16> for f64 {
+    fn lossy(&self) -> u16 {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as u16;
         result
     }
 }
