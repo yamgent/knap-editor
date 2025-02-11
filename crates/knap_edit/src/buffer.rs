@@ -1,8 +1,8 @@
 use std::{fs::File, io::Write, ops::Range};
 
 use anyhow::Result;
-use knap_base::math::{ToU64, ToUsizeClamp, Vec2u};
-use knap_window::terminal::{self, TerminalPos};
+use knap_base::math::{ToU64, ToUsize, Vec2f, Vec2u};
+use knap_window::drawer::Drawer;
 
 use crate::{
     highlighter::Highlights,
@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileType {
+pub(crate) enum FileType {
     Rust,
     PlainText,
 }
@@ -24,7 +24,7 @@ fn deduce_filetype<T: AsRef<str>>(filename: T) -> FileType {
     }
 }
 
-pub struct Buffer {
+pub(crate) struct Buffer {
     content: Vec<TextLine>,
     filename: Option<String>,
     is_dirty: bool,
@@ -32,7 +32,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             content: vec![],
             filename: None,
@@ -41,7 +41,7 @@ impl Buffer {
         }
     }
 
-    pub fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
+    pub(crate) fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
         let content = std::fs::read_to_string(filename.as_ref())?;
 
         Ok(Self {
@@ -52,16 +52,16 @@ impl Buffer {
         })
     }
 
-    pub fn is_untitled_file(&self) -> bool {
+    pub(crate) fn is_untitled_file(&self) -> bool {
         self.filename.is_none()
     }
 
-    pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
+    pub(crate) fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.filename = Some(filename.as_ref().to_string());
         self.file_type = deduce_filetype(filename);
     }
 
-    pub fn write_to_disk(&mut self) -> Result<()> {
+    pub(crate) fn write_to_disk(&mut self) -> Result<()> {
         if let Some(filename) = &self.filename {
             let mut file = File::create(filename)?;
             self.content
@@ -75,50 +75,51 @@ impl Buffer {
         Ok(())
     }
 
-    pub fn get_filename(&self) -> Option<String> {
+    pub(crate) fn get_filename(&self) -> Option<String> {
         self.filename.clone()
     }
 
-    pub fn get_is_dirty(&self) -> bool {
+    pub(crate) fn get_is_dirty(&self) -> bool {
         self.is_dirty
     }
 
-    pub fn file_type(&self) -> FileType {
+    pub(crate) fn file_type(&self) -> FileType {
         self.file_type
     }
 
-    pub fn get_line_len(&self, line_idx: usize) -> usize {
+    pub(crate) fn get_line_len(&self, line_idx: usize) -> usize {
         self.content.get(line_idx).map_or(0, TextLine::get_line_len)
     }
 
-    pub fn get_line_text_width(&self, line_idx: usize, end_x: usize) -> u64 {
+    pub(crate) fn get_line_text_width(&self, line_idx: usize, end_x: usize) -> u64 {
         self.content
             .get(line_idx)
             .map_or(0, |line| line.get_line_text_width(end_x))
     }
 
-    pub fn get_total_lines(&self) -> usize {
+    pub(crate) fn get_total_lines(&self) -> usize {
         self.content.len()
     }
 
-    pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
+    pub(crate) fn get_raw_line(&self, line_idx: usize) -> Option<String> {
         self.content.get(line_idx).map(ToString::to_string)
     }
 
-    pub fn render_line(
+    pub(crate) fn render_line(
         &self,
+        drawer: &mut Drawer,
         line_idx: usize,
-        screen_pos: TerminalPos,
+        screen_pos: Vec2f,
         text_offset_x: Range<u64>,
         line_highlight: &Highlights,
-    ) -> Result<()> {
+    ) {
         match self.content.get(line_idx) {
-            Some(line) => line.render_line(screen_pos, text_offset_x, line_highlight),
-            None => terminal::draw_text(screen_pos, "~"),
+            Some(line) => line.render_line(drawer, screen_pos, text_offset_x, line_highlight),
+            None => drawer.draw_text(screen_pos, "~"),
         }
     }
 
-    pub fn insert_character(
+    pub(crate) fn insert_character(
         &mut self,
         line_idx: usize,
         fragment_idx: usize,
@@ -142,14 +143,14 @@ impl Buffer {
         }
     }
 
-    pub fn remove_character(&mut self, line_idx: usize, fragment_idx: usize) {
+    pub(crate) fn remove_character(&mut self, line_idx: usize, fragment_idx: usize) {
         if let Some(line) = self.content.get_mut(line_idx) {
             line.remove_character(fragment_idx);
             self.is_dirty = true;
         }
     }
 
-    pub fn join_line_with_below_line(&mut self, line_idx: usize) {
+    pub(crate) fn join_line_with_below_line(&mut self, line_idx: usize) {
         let mut new_line_string = None;
 
         if let Some(first_line) = self.content.get(line_idx) {
@@ -171,7 +172,7 @@ impl Buffer {
         }
     }
 
-    pub fn insert_newline_at(&mut self, line_idx: usize, fragment_idx: usize) {
+    pub(crate) fn insert_newline_at(&mut self, line_idx: usize, fragment_idx: usize) {
         assert!(line_idx <= self.content.len());
 
         match self.content.get_mut(line_idx) {
@@ -187,19 +188,15 @@ impl Buffer {
         self.is_dirty = true;
     }
 
-    pub fn find<T: AsRef<str>>(
+    pub(crate) fn find<T: AsRef<str>>(
         &self,
         search: T,
         start_pos: Vec2u,
         search_direction: SearchDirection,
     ) -> Option<Vec2u> {
-        if let Some(first_line) = self.content.get(start_pos.y.to_usize_clamp()) {
+        if let Some(first_line) = self.content.get(start_pos.y.to_usize()) {
             let first_line_result = first_line
-                .find(
-                    &search,
-                    Some(start_pos.x.to_usize_clamp()),
-                    search_direction,
-                )
+                .find(&search, Some(start_pos.x.to_usize()), search_direction)
                 .map(|fragment_idx| Vec2u {
                     x: fragment_idx.to_u64(),
                     y: start_pos.y,
@@ -216,7 +213,7 @@ impl Buffer {
                 .iter()
                 .enumerate()
                 .cycle()
-                .skip(start_pos.y.saturating_add(1).to_usize_clamp())
+                .skip(start_pos.y.saturating_add(1).to_usize())
                 .take(self.content.len().saturating_sub(1))
                 .find_map(|(line_idx, line)| {
                     line.find(&search, None, search_direction)
@@ -231,11 +228,7 @@ impl Buffer {
                 .enumerate()
                 .rev()
                 .cycle()
-                .skip(
-                    self.content
-                        .len()
-                        .saturating_sub(start_pos.y.to_usize_clamp()),
-                )
+                .skip(self.content.len().saturating_sub(start_pos.y.to_usize()))
                 .take(self.content.len().saturating_sub(1))
                 .find_map(|(line_idx, line)| {
                     line.find(&search, None, search_direction)

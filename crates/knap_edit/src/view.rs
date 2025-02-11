@@ -1,6 +1,5 @@
-use anyhow::Result;
-use knap_base::math::{Bounds2u, ToU16Clamp, ToU64, ToUsizeClamp, Vec2u};
-use knap_window::terminal::TerminalPos;
+use knap_base::math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
+use knap_window::drawer::Drawer;
 
 use crate::{
     buffer::Buffer,
@@ -12,8 +11,8 @@ use crate::{
     status_bar::ViewStatus,
 };
 
-pub struct View {
-    bounds: Bounds2u,
+pub(crate) struct View {
+    bounds: Bounds2f,
 
     buffer: Buffer,
 
@@ -38,10 +37,10 @@ pub struct View {
 }
 
 impl View {
-    pub fn new(bounds: Bounds2u) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             buffer: Buffer::new(),
-            bounds,
+            bounds: Bounds2f::ZERO,
             caret_pos: Vec2u::ZERO,
             scroll_offset: Vec2u::ZERO,
             previous_line_caret_max_x: None,
@@ -51,17 +50,17 @@ impl View {
         }
     }
 
-    pub fn replace_buffer(&mut self, buffer: Buffer) {
+    pub(crate) fn replace_buffer(&mut self, buffer: Buffer) {
         self.buffer = buffer;
         self.highlight_info.update_file_type(&self.buffer);
     }
 
-    pub fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
+    pub(crate) fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.buffer.change_filename(filename);
         self.highlight_info.update_file_type(&self.buffer);
     }
 
-    pub fn get_status(&self) -> ViewStatus {
+    pub(crate) fn get_status(&self) -> ViewStatus {
         ViewStatus {
             filename: self.buffer.get_filename(),
             total_lines: self.buffer.get_total_lines(),
@@ -71,102 +70,89 @@ impl View {
         }
     }
 
-    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> TerminalPos {
-        TerminalPos {
+    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> Vec2u {
+        Vec2u {
             x: self
                 .buffer
-                .get_line_text_width(caret_pos.y.to_usize_clamp(), caret_pos.x.to_usize_clamp())
-                .to_u16_clamp(),
-            y: caret_pos.y.to_u16_clamp(),
+                .get_line_text_width(caret_pos.y.to_usize(), caret_pos.x.to_usize()),
+            y: caret_pos.y,
         }
     }
 
-    pub fn set_bounds(&mut self, bounds: Bounds2u) {
+    pub(crate) fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
         self.adjust_scroll_to_caret_grid_pos();
     }
 
-    pub fn render(&self) -> Result<TerminalPos> {
-        (0..self.bounds.size.y)
-            .map(|y| {
-                let line_idx = self.scroll_offset.y.saturating_add(y).to_usize_clamp();
-                self.buffer.render_line(
-                    line_idx,
-                    TerminalPos {
-                        x: self.bounds.pos.x.to_u16_clamp(),
-                        y: self
-                            .bounds
-                            .pos
-                            .y
-                            .to_u16_clamp()
-                            .saturating_add(y.to_u16_clamp()),
-                    },
-                    self.scroll_offset.x..(self.scroll_offset.x.saturating_add(self.bounds.size.x)),
-                    self.highlight_info
-                        .line_highlight(line_idx)
-                        .unwrap_or(&Highlights::new()),
-                )
-            })
-            .find(Result::is_err)
-            .unwrap_or(Ok(()))?;
+    pub(crate) fn render(&self, drawer: &mut Drawer) {
+        (0..self.bounds.size.y.lossy()).for_each(|y| {
+            let line_idx = self.scroll_offset.y.saturating_add(y).to_usize();
+            self.buffer.render_line(
+                drawer,
+                line_idx,
+                Vec2f {
+                    x: self.bounds.pos.x,
+                    y: self.bounds.pos.y + y.lossy(),
+                },
+                self.scroll_offset.x
+                    ..(self
+                        .scroll_offset
+                        .x
+                        .saturating_add(self.bounds.size.x.lossy())),
+                self.highlight_info
+                    .line_highlight(line_idx)
+                    .unwrap_or(&Highlights::new()),
+            );
+        });
 
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        let screen_cursor_pos = TerminalPos {
-            x: self.bounds.pos.x.to_u16_clamp().saturating_add(
-                grid_cursor_pos
-                    .x
-                    .saturating_sub(self.scroll_offset.x.to_u16_clamp()),
-            ),
-            y: self.bounds.pos.y.to_u16_clamp().saturating_add(
-                grid_cursor_pos
-                    .y
-                    .saturating_sub(self.scroll_offset.y.to_u16_clamp()),
-            ),
+        let screen_cursor_pos = Vec2u {
+            x: <f64 as Lossy<u64>>::lossy(&self.bounds.pos.x)
+                .saturating_add(grid_cursor_pos.x.saturating_sub(self.scroll_offset.x)),
+            y: <f64 as Lossy<u64>>::lossy(&self.bounds.pos.y)
+                .saturating_add(grid_cursor_pos.y.saturating_sub(self.scroll_offset.y)),
         };
 
-        Ok(screen_cursor_pos)
+        drawer.draw_cursor(Vec2f {
+            x: screen_cursor_pos.x.lossy(),
+            y: screen_cursor_pos.y.lossy(),
+        });
     }
 
     fn adjust_scroll_to_caret_grid_pos(&mut self) {
         let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
 
-        if grid_cursor_pos.x < self.scroll_offset.x.to_u16_clamp() {
-            self.scroll_offset.x = u64::from(grid_cursor_pos.x);
+        if grid_cursor_pos.x < self.scroll_offset.x {
+            self.scroll_offset.x = grid_cursor_pos.x;
         }
 
-        if grid_cursor_pos.y < self.scroll_offset.y.to_u16_clamp() {
-            self.scroll_offset.y = u64::from(grid_cursor_pos.y);
+        if grid_cursor_pos.y < self.scroll_offset.y {
+            self.scroll_offset.y = grid_cursor_pos.y;
         }
 
         if grid_cursor_pos.x
             >= self
                 .scroll_offset
                 .x
-                .saturating_add(self.bounds.size.x)
-                .to_u16_clamp()
+                .saturating_add(self.bounds.size.x.lossy())
         {
-            self.scroll_offset.x = u64::from(
-                grid_cursor_pos
-                    .x
-                    .saturating_sub(self.bounds.size.x.to_u16_clamp())
-                    .saturating_add(1),
-            );
+            self.scroll_offset.x = grid_cursor_pos
+                .x
+                .saturating_sub(self.bounds.size.x.lossy())
+                .saturating_add(1);
         }
 
         if grid_cursor_pos.y
             >= self
                 .scroll_offset
                 .y
-                .saturating_add(self.bounds.size.y)
-                .to_u16_clamp()
+                .saturating_add(self.bounds.size.y.lossy())
         {
-            self.scroll_offset.y = u64::from(
-                grid_cursor_pos
-                    .y
-                    .saturating_sub(self.bounds.size.y.to_u16_clamp())
-                    .saturating_add(1),
-            );
+            self.scroll_offset.y = grid_cursor_pos
+                .y
+                .saturating_sub(self.bounds.size.y.lossy())
+                .saturating_add(1);
         }
     }
 
@@ -175,7 +161,7 @@ impl View {
     fn adjust_caret_x_on_caret_y_movement(&mut self) {
         let line_len = self
             .buffer
-            .get_line_len(self.caret_pos.y.to_usize_clamp())
+            .get_line_len(self.caret_pos.y.to_usize())
             .to_u64();
 
         if self.caret_pos.x > line_len {
@@ -223,7 +209,7 @@ impl View {
         command_bar.set_prompt(CommandBarPrompt::Search);
     }
 
-    pub fn abort_search(&mut self) {
+    pub(crate) fn abort_search(&mut self) {
         self.caret_pos = self
             .before_search_caret_pos
             .take()
@@ -237,13 +223,13 @@ impl View {
         self.highlight_info.clear_search_highlights(&self.buffer);
     }
 
-    pub fn complete_search(&mut self) {
+    pub(crate) fn complete_search(&mut self) {
         self.before_search_caret_pos.take();
         self.before_search_scroll_offset.take();
         self.highlight_info.clear_search_highlights(&self.buffer);
     }
 
-    pub fn find<T: AsRef<str>>(
+    pub(crate) fn find<T: AsRef<str>>(
         &mut self,
         search: T,
         first_search: bool,
@@ -278,7 +264,7 @@ impl View {
 
     // splitting the function up doesn't change the readability much
     #[allow(clippy::too_many_lines)]
-    pub fn execute_command(
+    pub(crate) fn execute_command(
         &mut self,
         command: EditorCommand,
         message_bar: &mut MessageBar,
@@ -304,7 +290,7 @@ impl View {
                         self.change_caret_xy(Vec2u {
                             x: self
                                 .buffer
-                                .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize_clamp())
+                                .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                                 .to_u64(),
                             y: self.caret_pos.y.saturating_sub(1),
                         });
@@ -319,7 +305,7 @@ impl View {
             EditorCommand::MoveCursorRight => {
                 let line_len = self
                     .buffer
-                    .get_line_len(self.caret_pos.y.to_usize_clamp())
+                    .get_line_len(self.caret_pos.y.to_usize())
                     .to_u64();
 
                 if self.caret_pos.x == line_len {
@@ -337,14 +323,14 @@ impl View {
                 true
             }
             EditorCommand::MoveCursorUpOnePage => {
-                self.change_caret_y(self.caret_pos.y.saturating_sub(self.bounds.size.y));
+                self.change_caret_y(self.caret_pos.y.saturating_sub(self.bounds.size.y.lossy()));
                 true
             }
             EditorCommand::MoveCursorDownOnePage => {
                 self.change_caret_y(
                     self.caret_pos
                         .y
-                        .saturating_add(self.bounds.size.y)
+                        .saturating_add(self.bounds.size.y.lossy())
                         .clamp(0, self.buffer.get_total_lines().to_u64()),
                 );
                 true
@@ -356,15 +342,15 @@ impl View {
             EditorCommand::MoveCursorToEndOfLine => {
                 self.change_caret_x(
                     self.buffer
-                        .get_line_len(self.caret_pos.y.to_usize_clamp())
+                        .get_line_len(self.caret_pos.y.to_usize())
                         .to_u64(),
                 );
                 true
             }
             EditorCommand::InsertCharacter(ch) => {
                 match self.buffer.insert_character(
-                    self.caret_pos.y.to_usize_clamp(),
-                    self.caret_pos.x.to_usize_clamp(),
+                    self.caret_pos.y.to_usize(),
+                    self.caret_pos.x.to_usize(),
                     ch,
                 ) {
                     Ok(result) => {
@@ -381,8 +367,8 @@ impl View {
             EditorCommand::EraseCharacterBeforeCursor => {
                 if self.caret_pos.x > 0 {
                     self.buffer.remove_character(
-                        self.caret_pos.y.to_usize_clamp(),
-                        self.caret_pos.x.saturating_sub(1).to_usize_clamp(),
+                        self.caret_pos.y.to_usize(),
+                        self.caret_pos.x.saturating_sub(1).to_usize(),
                     );
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
@@ -391,12 +377,11 @@ impl View {
                 } else if self.caret_pos.y > 0 {
                     let previous_line_len = self
                         .buffer
-                        .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize_clamp())
+                        .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                         .to_u64();
 
-                    self.buffer.join_line_with_below_line(
-                        self.caret_pos.y.saturating_sub(1).to_usize_clamp(),
-                    );
+                    self.buffer
+                        .join_line_with_below_line(self.caret_pos.y.saturating_sub(1).to_usize());
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
 
@@ -413,18 +398,16 @@ impl View {
                 if self.caret_pos.x
                     < self
                         .buffer
-                        .get_line_len(self.caret_pos.y.to_usize_clamp())
+                        .get_line_len(self.caret_pos.y.to_usize())
                         .to_u64()
                 {
-                    self.buffer.remove_character(
-                        self.caret_pos.y.to_usize_clamp(),
-                        self.caret_pos.x.to_usize_clamp(),
-                    );
+                    self.buffer
+                        .remove_character(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
                 } else if self.caret_pos.y < self.buffer.get_total_lines().to_u64() {
                     self.buffer
-                        .join_line_with_below_line(self.caret_pos.y.to_usize_clamp());
+                        .join_line_with_below_line(self.caret_pos.y.to_usize());
                     self.highlight_info
                         .regenerate_on_buffer_change(&self.buffer);
                 }
@@ -434,10 +417,8 @@ impl View {
             }
 
             EditorCommand::InsertNewline => {
-                self.buffer.insert_newline_at(
-                    self.caret_pos.y.to_usize_clamp(),
-                    self.caret_pos.x.to_usize_clamp(),
-                );
+                self.buffer
+                    .insert_newline_at(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
                 self.highlight_info
                     .regenerate_on_buffer_change(&self.buffer);
                 self.change_caret_xy(Vec2u {

@@ -1,9 +1,11 @@
 use std::{error::Error, fmt::Display, ops::Range};
 
 use anyhow::Result;
-use crossterm::style::Color;
-use knap_base::math::ToU16Clamp;
-use knap_window::terminal::{self, TerminalPos};
+use knap_base::{
+    color::Color,
+    math::{Lossy, Vec2f},
+};
+use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
@@ -34,12 +36,12 @@ struct TextFragment {
     start_byte_index: usize,
 }
 
-pub struct TextLine {
+pub(crate) struct TextLine {
     fragments: Vec<TextFragment>,
     string: String,
 }
 
-pub struct InsertCharResult {
+pub(crate) struct InsertCharResult {
     /// There could be scenarios where an insertion of
     /// a new character results in grapheme clusters
     /// merging together. In those situations, the line
@@ -54,7 +56,7 @@ pub struct InsertCharResult {
 }
 
 #[derive(Debug)]
-pub enum InsertCharError {
+pub(crate) enum InsertCharError {
     InvalidPosition,
 }
 
@@ -117,18 +119,18 @@ fn build_fragments_from_string<T: AsRef<str>>(content: T) -> Vec<TextFragment> {
 }
 
 impl TextLine {
-    pub fn new<T: AsRef<str>>(content: T) -> Self {
+    pub(crate) fn new<T: AsRef<str>>(content: T) -> Self {
         Self {
             fragments: build_fragments_from_string(&content),
             string: content.as_ref().to_string(),
         }
     }
 
-    pub fn get_line_len(&self) -> usize {
+    pub(crate) fn get_line_len(&self) -> usize {
         self.fragments.len()
     }
 
-    pub fn get_line_text_width(&self, end_x: usize) -> u64 {
+    pub(crate) fn get_line_text_width(&self, end_x: usize) -> u64 {
         self.fragments
             .iter()
             .take(end_x)
@@ -139,12 +141,13 @@ impl TextLine {
     // TODO: Consider refactoring this in the future, so that we
     // do not have to disable too_many_lines lint
     #[allow(clippy::too_many_lines)]
-    pub fn render_line(
+    pub(crate) fn render_line(
         &self,
-        screen_pos: TerminalPos,
+        drawer: &mut Drawer,
+        screen_pos: Vec2f,
         text_offset_x: Range<u64>,
         highlights: &Highlights,
-    ) -> Result<()> {
+    ) {
         let mut current_x = 0;
         let mut fragment_iter = self.fragments.iter();
 
@@ -200,56 +203,45 @@ impl TextLine {
                     acc
                 },
             );
-            grouped_strings
-                .into_iter()
-                .fold(
-                    (0u64, Ok(())),
-                    |(x_offset, recent_result), (string, string_width, highlight_type)| {
-                        if recent_result.is_err() {
-                            (0, recent_result)
-                        } else {
-                            let next_x_offset = x_offset.saturating_add(string_width);
-                            let (foreground, background) = match highlight_type {
-                                None => (None, None),
-                                Some(HighlightType::SearchMatch) => {
-                                    (Some(Color::Black), Some(Color::Yellow))
-                                }
-                                Some(HighlightType::SearchCursor) => {
-                                    (Some(Color::Black), Some(Color::Blue))
-                                }
-                                Some(HighlightType::Number) => (Some(Color::DarkRed), None),
-                                Some(HighlightType::Keyword) => (Some(Color::Blue), None),
-                                Some(HighlightType::BasicType) => (Some(Color::Green), None),
-                                Some(HighlightType::EnumLiteral) => (Some(Color::DarkBlue), None),
-                                Some(HighlightType::Character) => (Some(Color::DarkYellow), None),
-                                Some(HighlightType::LifetimeSpecifier) => {
-                                    (Some(Color::DarkYellow), None)
-                                }
-                                Some(HighlightType::Comment) => (Some(Color::DarkGreen), None),
-                            };
-
-                            (
-                                next_x_offset,
-                                terminal::draw_colored_text(
-                                    TerminalPos {
-                                        x: screen_pos.x.saturating_add(x_offset.to_u16_clamp()),
-                                        y: screen_pos.y,
-                                    },
-                                    string,
-                                    foreground,
-                                    background,
-                                ),
-                            )
+            grouped_strings.into_iter().fold(
+                0u64,
+                |x_offset, (string, string_width, highlight_type)| {
+                    let next_x_offset = x_offset.saturating_add(string_width);
+                    let (foreground, background) = match highlight_type {
+                        None => (None, None),
+                        Some(HighlightType::SearchMatch) => {
+                            (Some(Color::BLACK), Some(Color::YELLOW))
                         }
-                    },
-                )
-                .1?;
-        }
+                        Some(HighlightType::SearchCursor) => {
+                            (Some(Color::BLACK), Some(Color::BLUE))
+                        }
+                        Some(HighlightType::Number) => (Some(Color::DARK_RED), None),
+                        Some(HighlightType::Keyword) => (Some(Color::BLUE), None),
+                        Some(HighlightType::BasicType) => (Some(Color::GREEN), None),
+                        Some(HighlightType::EnumLiteral) => (Some(Color::CYAN), None),
+                        Some(HighlightType::Character | HighlightType::LifetimeSpecifier) => {
+                            (Some(Color::DARK_YELLOW), None)
+                        }
+                        Some(HighlightType::Comment) => (Some(Color::DARK_GREEN), None),
+                    };
 
-        Ok(())
+                    drawer.draw_colored_text(
+                        Vec2f {
+                            x: screen_pos.x + x_offset.lossy(),
+                            y: screen_pos.y,
+                        },
+                        string,
+                        foreground,
+                        background,
+                    );
+
+                    next_x_offset
+                },
+            );
+        }
     }
 
-    pub fn insert_character(
+    pub(crate) fn insert_character(
         &mut self,
         fragment_idx: usize,
         character: char,
@@ -281,7 +273,7 @@ impl TextLine {
         }
     }
 
-    pub fn remove_character(&mut self, fragment_idx: usize) {
+    pub(crate) fn remove_character(&mut self, fragment_idx: usize) {
         if fragment_idx < self.fragments.len() {
             let new_string = self
                 .fragments
@@ -295,7 +287,7 @@ impl TextLine {
     }
 
     #[must_use]
-    pub fn split_off(&mut self, fragment_idx: usize) -> Self {
+    pub(crate) fn split_off(&mut self, fragment_idx: usize) -> Self {
         let left = self
             .fragments
             .iter()
@@ -325,7 +317,7 @@ impl TextLine {
             .map(|fragment| fragment.start_byte_index)
     }
 
-    pub fn find<T: AsRef<str>>(
+    pub(crate) fn find<T: AsRef<str>>(
         &self,
         search: T,
         start_from_fragment_idx: Option<usize>,

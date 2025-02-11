@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum EditorCommand {
+pub(crate) enum EditorCommand {
     QuitAll,
     MoveCursorUp,
     MoveCursorDown,

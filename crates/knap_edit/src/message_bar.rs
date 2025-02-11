@@ -1,41 +1,32 @@
-use anyhow::Result;
-use knap_base::math::{Bounds2u, ToU16Clamp};
-use knap_window::terminal::{self, TerminalPos};
+use knap_base::math::Bounds2f;
+use knap_window::drawer::Drawer;
 
-pub struct MessageBar {
-    bounds: Bounds2u,
+pub(crate) struct MessageBar {
+    bounds: Bounds2f,
     message: Option<String>,
 }
 
 impl MessageBar {
-    pub fn new(bounds: Bounds2u) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            bounds,
+            bounds: Bounds2f::ZERO,
             message: None,
         }
     }
 
-    pub fn set_bounds(&mut self, bounds: Bounds2u) {
+    pub(crate) fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
     }
 
-    pub fn set_message<T: AsRef<str>>(&mut self, message: T) {
+    pub(crate) fn set_message<T: AsRef<str>>(&mut self, message: T) {
         self.message = Some(message.as_ref().to_string());
     }
 
-    pub fn render(&self) -> Result<()> {
-        if self.bounds.size.saturating_area() > 0 {
+    pub(crate) fn render(&self, drawer: &mut Drawer) {
+        if self.bounds.size.x * self.bounds.size.y > 0.0 {
             if let Some(message) = &self.message {
-                terminal::draw_text(
-                    TerminalPos {
-                        x: self.bounds.pos.x.to_u16_clamp(),
-                        y: self.bounds.pos.y.to_u16_clamp(),
-                    },
-                    message,
-                )?;
+                drawer.draw_text(self.bounds.pos, message);
             }
         }
-
-        Ok(())
     }
 }

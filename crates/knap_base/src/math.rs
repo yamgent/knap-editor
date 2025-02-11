@@ -12,40 +12,28 @@ impl Vec2u {
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
-pub struct Bounds2u {
-    pub pos: Vec2u,
-    pub size: Vec2u,
+#[derive(Default, Clone, Copy, PartialEq)]
+pub struct Vec2f {
+    pub x: f64,
+    pub y: f64,
 }
 
-pub trait ToUsizeClamp
-where
-    Self: TryInto<usize>,
-{
-    /// This is used to get rid of the `clippy::cast_possible_truncation`
-    /// lint error, as `Self` may have more bits than `usize`. When that happens,
-    /// then we clamp the value to `usize::MAX`
-    fn to_usize_clamp(self) -> usize {
-        self.try_into().unwrap_or(usize::MAX)
-    }
+impl Vec2f {
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
 }
 
-impl ToUsizeClamp for u64 {}
-
-pub trait ToU16Clamp
-where
-    Self: TryInto<u16>,
-{
-    /// This is used to get rid of the `clippy::cast_possible_truncation`
-    /// lint error, as `Self` may have more bits than `u16`. When that happens,
-    /// then we clamp the value to `u16::MAX`
-    fn to_u16_clamp(self) -> u16 {
-        self.try_into().unwrap_or(u16::MAX)
-    }
+#[derive(Default, Clone, Copy, PartialEq)]
+pub struct Bounds2f {
+    pub pos: Vec2f,
+    pub size: Vec2f,
 }
 
-impl ToU16Clamp for u64 {}
-impl ToU16Clamp for usize {}
+impl Bounds2f {
+    pub const ZERO: Self = Self {
+        pos: Vec2f::ZERO,
+        size: Vec2f::ZERO,
+    };
+}
 
 pub trait ToU64 {
     fn to_u64(self) -> u64;
@@ -53,11 +41,89 @@ pub trait ToU64 {
 
 impl ToU64 for usize {
     fn to_u64(self) -> u64 {
-        assert!(std::mem::size_of::<usize>() == 8);
+        debug_assert!(std::mem::size_of::<usize>() == 8);
 
         #[allow(clippy::as_conversions)]
         let result = self as u64;
 
+        result
+    }
+}
+
+pub trait ToUsize {
+    fn to_usize(self) -> usize;
+}
+
+impl ToUsize for u64 {
+    fn to_usize(self) -> usize {
+        debug_assert!(std::mem::size_of::<usize>() == 8);
+
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::as_conversions)]
+        let result = self as usize;
+
+        result
+    }
+}
+
+/// Allow conversion from a numeric type to another type,
+/// with the loss of precision accepted.
+///
+/// Note that most of the time, this indicates that an API is
+/// poorly designed. However, there could be situations where
+/// the API design is beyond our control, and for those instances,
+/// using `Lossy` is an acceptable alternative.
+///
+/// Most implementation of `Lossy` follows the behaviour as described
+/// in [`as` documentation](https://doc.rust-lang.org/nightly/reference/expressions/operator-expr.html#semantics).
+pub trait Lossy<U> {
+    fn lossy(&self) -> U;
+}
+
+impl Lossy<f64> for usize {
+    fn lossy(&self) -> f64 {
+        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as f64;
+        result
+    }
+}
+
+impl Lossy<f64> for u64 {
+    fn lossy(&self) -> f64 {
+        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as f64;
+        result
+    }
+}
+
+impl Lossy<usize> for f64 {
+    fn lossy(&self) -> usize {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as usize;
+        result
+    }
+}
+
+impl Lossy<u16> for f64 {
+    fn lossy(&self) -> u16 {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as u16;
+        result
+    }
+}
+
+impl Lossy<u64> for f64 {
+    fn lossy(&self) -> u64 {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::as_conversions)]
+        let result = *self as u64;
         result
     }
 }

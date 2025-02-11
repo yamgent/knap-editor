@@ -1,9 +1,7 @@
-use std::panic;
-
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use knap_base::math::{Bounds2u, Vec2u};
-use knap_window::terminal;
+use knap_base::math::{Bounds2f, Vec2f};
+use knap_window::{drawer::Drawer, window::Window};
 
 use crate::{
     buffer::Buffer,
@@ -14,18 +12,10 @@ use crate::{
     view::View,
 };
 
-fn setup_panic_hook() {
-    let current_hook = panic::take_hook();
-    panic::set_hook(Box::new(move |panic_info| {
-        // we can't do anything to recover if end_terminal returns an error,
-        // so just ignore the Result
-        let _ = terminal::end_terminal();
-        current_hook(panic_info);
-    }));
-}
-
 pub struct Editor {
     should_quit: bool,
+    window: Window,
+    drawer: Drawer,
 
     /// this is used to block the user if he tries to
     /// quit the editor without saving a modified file
@@ -39,71 +29,34 @@ pub struct Editor {
 
 impl Editor {
     pub fn new() -> Self {
-        let terminal_size = terminal::size_u64().expect("able to get terminal size");
-
-        let view = View::new(Bounds2u {
-            pos: Vec2u { x: 0, y: 0 },
-            size: Vec2u {
-                x: terminal_size.x,
-                y: terminal_size.y.saturating_sub(2),
-            },
-        });
-
-        let status_bar = StatusBar::new(Bounds2u {
-            pos: Vec2u {
-                x: 0,
-                y: terminal_size.y.saturating_sub(2),
-            },
-            size: Vec2u {
-                x: terminal_size.x,
-                y: u64::from(terminal_size.y > 1),
-            },
-        });
-
-        let mut message_bar = MessageBar::new(Bounds2u {
-            pos: Vec2u {
-                x: 0,
-                y: terminal_size.y.saturating_sub(1),
-            },
-            size: Vec2u {
-                x: terminal_size.x,
-                y: 1,
-            },
-        });
-        message_bar.set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
-
-        let command_bar = CommandBar::new(Bounds2u {
-            pos: Vec2u {
-                x: 0,
-                y: terminal_size.y.saturating_sub(1),
-            },
-            size: Vec2u {
-                x: terminal_size.x,
-                y: 1,
-            },
-        });
-
         Self {
             should_quit: false,
+            window: Window::new(),
+            drawer: Drawer::new(),
             block_quit_remaining_tries: 0,
-            view,
-            status_bar,
-            message_bar,
-            command_bar,
+            view: View::new(),
+            status_bar: StatusBar::new(),
+            message_bar: MessageBar::new(),
+            command_bar: CommandBar::new(),
         }
     }
 
     pub fn run(&mut self) {
-        setup_panic_hook();
+        self.window.init();
+        self.window
+            .set_title("[No Name]")
+            .expect("able to set title");
 
-        terminal::init_terminal().expect("able to initialize terminal");
-        terminal::set_title("[No Name]").expect("able to set title");
+        let terminal_size = self.window.size();
+        self.handle_new_window_size(terminal_size);
+        self.message_bar
+            .set_message("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
 
         self.open_arg_file();
 
         let repl_result = self.repl();
 
-        terminal::end_terminal().expect("able to deinit terminal");
+        self.window.deinit();
         repl_result.expect("repl has no fatal error");
     }
 
@@ -118,7 +71,7 @@ impl Editor {
                 }
             };
             self.view.replace_buffer(buffer);
-            terminal::set_title(&filename).expect("able to set title");
+            self.window.set_title(&filename).expect("able to set title");
         }
     }
 
@@ -152,7 +105,7 @@ impl Editor {
                 self.command_bar.clear_prompt();
                 if matches!(prompt, CommandBarPrompt::SaveAs) {
                     self.view.change_filename(&value);
-                    terminal::set_title(value).expect("able to set title");
+                    self.window.set_title(&value).expect("able to set title");
                     self.execute_command(EditorCommand::WriteBufferToDisk);
                 }
             }
@@ -169,6 +122,40 @@ impl Editor {
             };
             result
         }
+    }
+
+    fn handle_new_window_size(&mut self, size: Vec2f) {
+        self.view.set_bounds(Bounds2f {
+            pos: Vec2f::ZERO,
+            size: Vec2f {
+                x: size.x,
+                y: size.y - 2.0,
+            },
+        });
+        self.status_bar.set_bounds(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: size.y - 2.0,
+            },
+            size: Vec2f {
+                x: size.x,
+                y: if size.y > 1.0 { 1.0 } else { 0.0 },
+            },
+        });
+        self.message_bar.set_bounds(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: size.y - 1.0,
+            },
+            size: Vec2f { x: size.x, y: 1.0 },
+        });
+        self.command_bar.set_bounds(Bounds2f {
+            pos: Vec2f {
+                x: 0.0,
+                y: size.y - 1.0,
+            },
+            size: Vec2f { x: size.x, y: 1.0 },
+        });
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
@@ -231,64 +218,32 @@ impl Editor {
                 }
             }
             Event::Resize(width, height) => {
-                self.view.set_bounds(Bounds2u {
-                    pos: Vec2u { x: 0, y: 0 },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: height.saturating_sub(2).into(),
-                    },
-                });
-                self.status_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(2).into(),
-                    },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: u64::from(*height > 1),
-                    },
-                });
-                self.message_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(1).into(),
-                    },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: 1,
-                    },
-                });
-                self.command_bar.set_bounds(Bounds2u {
-                    pos: Vec2u {
-                        x: 0,
-                        y: height.saturating_sub(1).into(),
-                    },
-                    size: Vec2u {
-                        x: (*width).into(),
-                        y: 1,
-                    },
-                });
+                let size = Vec2f {
+                    x: f64::from(*width),
+                    y: f64::from(*height),
+                };
+
+                self.handle_new_window_size(size);
                 true
             }
             _ => false,
         }
     }
 
-    fn draw(&self) -> Result<()> {
-        let mut state = terminal::start_draw()?;
+    fn draw(&mut self) -> Result<()> {
+        self.drawer.clear();
 
-        let mut new_cursor_pos = self.view.render()?;
-        self.status_bar.render(self.view.get_status())?;
+        self.view.render(&mut self.drawer);
+        self.status_bar
+            .render(&mut self.drawer, self.view.get_status());
 
         if self.command_bar.has_active_prompt() {
-            new_cursor_pos = self.command_bar.render()?;
+            self.command_bar.render(&mut self.drawer);
         } else {
-            self.message_bar.render()?;
+            self.message_bar.render(&mut self.drawer);
         }
 
-        state.cursor_pos = new_cursor_pos;
-
-        terminal::end_draw(&state)?;
+        self.drawer.present()?;
         Ok(())
     }
 }
