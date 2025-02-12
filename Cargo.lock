@@ -97,6 +97,13 @@ dependencies = [
 [[package]]
 name = "knap_ui"
 version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "knap_base",
+ "knap_window",
+ "unicode-segmentation",
+ "unicode-width",
+]
 
 [[package]]
 name = "knap_window"
