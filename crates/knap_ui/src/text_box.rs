@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Display, ops::Range};
 use anyhow::Result;
 use knap_base::{
     color::Color,
-    math::{Lossy, Vec2f},
+    math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u},
 };
 use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
@@ -63,7 +63,7 @@ pub(crate) struct TextLine {
     string: String,
 }
 
-pub(crate) struct InsertCharResult {
+pub struct InsertCharResult {
     /// There could be scenarios where an insertion of
     /// a new character results in grapheme clusters
     /// merging together. In those situations, the line
@@ -78,7 +78,7 @@ pub(crate) struct InsertCharResult {
 }
 
 #[derive(Debug)]
-pub(crate) enum InsertCharError {
+pub enum InsertCharError {
     InvalidPosition,
 }
 
@@ -367,5 +367,160 @@ impl TextLine {
 impl Display for TextLine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.string)
+    }
+}
+
+pub struct TextBox {
+    bounds: Bounds2f,
+
+    // TODO: Upgrade to a vector of lines in the future
+    contents: TextLine,
+
+    caret_pos: Vec2u,
+    scroll_offset: Vec2u,
+}
+
+impl TextBox {
+    pub fn new() -> Self {
+        Self {
+            bounds: Bounds2f::ZERO,
+            contents: TextLine::new(""),
+            caret_pos: Vec2u::ZERO,
+            scroll_offset: Vec2u::ZERO,
+        }
+    }
+
+    pub fn bounds(&self) -> Bounds2f {
+        self.bounds
+    }
+
+    pub fn set_bounds(&mut self, bounds: Bounds2f) {
+        self.bounds = bounds;
+    }
+
+    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> Vec2u {
+        Vec2u {
+            x: self.contents.get_line_text_width(caret_pos.x.to_usize()),
+            y: caret_pos.y,
+        }
+    }
+
+    fn adjust_scroll_to_caret_grid_pos(&mut self) {
+        let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
+
+        if grid_cursor_pos.x < self.scroll_offset.x {
+            self.scroll_offset.x = grid_cursor_pos.x;
+        }
+
+        if grid_cursor_pos.x
+            >= self
+                .scroll_offset
+                .x
+                .saturating_add(self.bounds.size.x.lossy())
+        {
+            self.scroll_offset.x = grid_cursor_pos
+                .x
+                .saturating_sub(self.bounds.size.x.lossy())
+                .saturating_add(1);
+        }
+    }
+
+    fn change_caret_x(&mut self, new_x: u64) {
+        self.caret_pos.x = new_x;
+        self.adjust_scroll_to_caret_grid_pos();
+    }
+
+    pub fn move_cursor_left(&mut self) {
+        self.change_caret_x(self.caret_pos.x.saturating_sub(1));
+    }
+
+    pub fn move_cursor_right(&mut self) {
+        self.change_caret_x(
+            self.caret_pos
+                .x
+                .saturating_add(1)
+                .clamp(0, self.contents.get_line_len().to_u64()),
+        );
+    }
+
+    pub fn move_cursor_to_start_of_line(&mut self) {
+        self.change_caret_x(0);
+    }
+
+    pub fn move_cursor_to_end_of_line(&mut self) {
+        self.change_caret_x(self.contents.get_line_len().to_u64());
+    }
+
+    pub fn insert_character_at_cursor(
+        &mut self,
+        ch: char,
+    ) -> Result<InsertCharResult, InsertCharError> {
+        let result = self
+            .contents
+            .insert_character(self.caret_pos.x.to_usize(), ch);
+
+        if let Ok(success_result) = &result {
+            if success_result.line_len_increased {
+                self.change_caret_x(self.caret_pos.x.saturating_add(1));
+            }
+        }
+
+        result
+    }
+
+    pub fn erase_character_before_cursor(&mut self) {
+        if self.caret_pos.x > 0 {
+            self.contents
+                .remove_character(self.caret_pos.x.saturating_sub(1).to_usize());
+            self.change_caret_x(self.caret_pos.x.saturating_sub(1));
+        }
+    }
+
+    pub fn erase_character_after_cursor(&mut self) {
+        if self.caret_pos.x < self.contents.get_line_len().to_u64() {
+            self.contents.remove_character(self.caret_pos.x.to_usize());
+        }
+    }
+
+    pub fn get_entire_contents_as_string(&self) -> String {
+        self.contents.to_string()
+    }
+
+    pub fn clear(&mut self) {
+        self.contents = TextLine::new("");
+        self.caret_pos = Vec2u::ZERO;
+        self.scroll_offset = Vec2u::ZERO;
+    }
+
+    pub fn render(&self, drawer: &mut Drawer) {
+        if self.bounds.size.x * self.bounds.size.y > 0.0 {
+            self.contents.render_line(
+                drawer,
+                Vec2f {
+                    x: self.bounds.pos.x,
+                    y: self.bounds.pos.y,
+                },
+                self.scroll_offset.x
+                    ..(self
+                        .scroll_offset
+                        .x
+                        .saturating_add(self.bounds.size.x.lossy())),
+                &TextHighlights::new(),
+            );
+
+            let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
+
+            let screen_cursor_pos = Vec2u {
+                x: <f64 as Lossy<u64>>::lossy(&self.bounds.pos.x)
+                    .saturating_add(grid_cursor_pos.x.saturating_sub(self.scroll_offset.x)),
+                y: <f64 as Lossy<u64>>::lossy(&self.bounds.pos.y)
+                    .saturating_add(grid_cursor_pos.y.saturating_sub(self.scroll_offset.y)),
+            };
+
+            drawer.draw_cursor(Vec2f {
+                x: screen_cursor_pos.x.lossy(),
+                y: screen_cursor_pos.y.lossy(),
+            });
+        }
     }
 }
