@@ -376,6 +376,16 @@ pub struct TextBox {
     contents: Vec<TextLine>,
     is_dirty: bool,
 
+    /// Best effort single line mode.
+    ///
+    /// When this is true, the text box will attempt to
+    /// ensure that the caret can only be on a single line.
+    ///
+    /// However, if the TextBox's content is not single line,
+    /// the content will remain multi-line, and be rendered as such,
+    /// but the caret will still be constrained to a single line.
+    single_line_mode: bool,
+
     caret_pos: Vec2u,
     scroll_offset: Vec2u,
 
@@ -397,9 +407,21 @@ impl TextBox {
             bounds: Bounds2f::ZERO,
             contents: vec![],
             is_dirty: false,
+            single_line_mode: false,
             caret_pos: Vec2u::ZERO,
             scroll_offset: Vec2u::ZERO,
             previous_line_caret_max_x: None,
+        }
+    }
+
+    /// Best effort single line text box.
+    ///
+    /// See `Self::single_line_mode` for more details regarding
+    /// the "best effort" part.
+    pub fn new_single_line_text_box() -> Self {
+        Self {
+            single_line_mode: true,
+            ..Self::new()
         }
     }
 
@@ -516,21 +538,29 @@ impl TextBox {
     }
 
     pub fn move_cursor_up(&mut self) {
-        self.change_caret_y(self.caret_pos.y.saturating_sub(1));
+        if self.single_line_mode {
+            self.change_caret_y(0);
+        } else {
+            self.change_caret_y(self.caret_pos.y.saturating_sub(1));
+        }
     }
 
     pub fn move_cursor_down(&mut self) {
-        self.change_caret_y(
-            self.caret_pos
-                .y
-                .saturating_add(1)
-                .clamp(0, self.get_total_lines().to_u64()),
-        );
+        if self.single_line_mode {
+            self.change_caret_y(0);
+        } else {
+            self.change_caret_y(
+                self.caret_pos
+                    .y
+                    .saturating_add(1)
+                    .clamp(0, self.get_total_lines().to_u64()),
+            );
+        }
     }
 
     pub fn move_cursor_left(&mut self) {
         if self.caret_pos.x == 0 {
-            if self.caret_pos.y > 0 {
+            if self.caret_pos.y > 0 && !self.single_line_mode {
                 self.change_caret_xy(Vec2u {
                     x: self
                         .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
@@ -549,7 +579,7 @@ impl TextBox {
         let line_len = self.get_line_len(self.caret_pos.y.to_usize()).to_u64();
 
         if self.caret_pos.x == line_len {
-            if self.caret_pos.y < self.get_total_lines().to_u64() {
+            if self.caret_pos.y < self.get_total_lines().to_u64() && !self.single_line_mode {
                 self.change_caret_xy(Vec2u {
                     x: 0,
                     y: self.caret_pos.y.saturating_add(1),
@@ -563,16 +593,24 @@ impl TextBox {
     }
 
     pub fn move_cursor_up_one_page(&mut self) {
-        self.change_caret_y(self.caret_pos.y.saturating_sub(self.bounds.size.y.lossy()));
+        if self.single_line_mode {
+            self.change_caret_y(0);
+        } else {
+            self.change_caret_y(self.caret_pos.y.saturating_sub(self.bounds.size.y.lossy()));
+        }
     }
 
     pub fn move_cursor_down_one_page(&mut self) {
-        self.change_caret_y(
-            self.caret_pos
-                .y
-                .saturating_add(self.bounds.size.y.lossy())
-                .clamp(0, self.get_total_lines().to_u64()),
-        );
+        if self.single_line_mode {
+            self.change_caret_y(0);
+        } else {
+            self.change_caret_y(
+                self.caret_pos
+                    .y
+                    .saturating_add(self.bounds.size.y.lossy())
+                    .clamp(0, self.get_total_lines().to_u64()),
+            );
+        }
     }
 
     pub fn move_cursor_to_start_of_line(&mut self) {
@@ -616,7 +654,7 @@ impl TextBox {
         }
     }
 
-    pub fn join_line_with_below_line(&mut self, line_idx: usize) {
+    fn join_line_with_below_line(&mut self, line_idx: usize) {
         let mut new_line_string = None;
 
         if let Some(first_line) = self.contents.get(line_idx) {
@@ -644,9 +682,10 @@ impl TextBox {
                 self.caret_pos.y.to_usize(),
                 self.caret_pos.x.saturating_sub(1).to_usize(),
             );
+            // TODO: If the line length still stays the same, then should not subtract 1 from caret_pos.x
             self.change_caret_x(self.caret_pos.x.saturating_sub(1));
             self.is_dirty = true;
-        } else if self.caret_pos.y > 0 {
+        } else if self.caret_pos.y > 0 && !self.single_line_mode {
             let previous_line_len = self
                 .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                 .to_u64();
@@ -668,7 +707,7 @@ impl TextBox {
         if self.caret_pos.x < self.get_line_len(self.caret_pos.y.to_usize()).to_u64() {
             self.remove_character(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
             self.is_dirty = true;
-        } else if self.caret_pos.y < self.get_total_lines().to_u64() {
+        } else if self.caret_pos.y < self.get_total_lines().to_u64() && !self.single_line_mode {
             self.join_line_with_below_line(self.caret_pos.y.to_usize());
             self.is_dirty = true;
         }
@@ -677,6 +716,10 @@ impl TextBox {
     }
 
     pub fn insert_newline_at_cursor(&mut self) {
+        if self.single_line_mode {
+            return;
+        }
+
         assert!(self.caret_pos.y <= self.get_total_lines().to_u64());
 
         match self.contents.get_mut(self.caret_pos.y.to_usize()) {
@@ -727,7 +770,11 @@ impl TextBox {
     ) {
         match self.contents.get(line_idx) {
             Some(line) => line.render_line(drawer, screen_pos, text_offset_x, line_highlight),
-            None => drawer.draw_text(screen_pos, "~"),
+            None => {
+                if !self.single_line_mode {
+                    drawer.draw_text(screen_pos, "~");
+                }
+            }
         }
     }
 

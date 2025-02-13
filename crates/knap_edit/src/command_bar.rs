@@ -40,7 +40,7 @@ impl CommandBar {
         Self {
             bounds: Bounds2f::ZERO,
             prompt: CommandBarPrompt::None,
-            text_box: TextBox::new(),
+            text_box: TextBox::new_single_line_text_box(),
         }
     }
 
