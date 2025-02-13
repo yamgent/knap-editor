@@ -51,7 +51,7 @@ impl CommandBar {
 
     pub(crate) fn clear_prompt(&mut self) {
         self.prompt = CommandBarPrompt::None;
-        self.text_box.clear();
+        self.text_box.reset();
     }
 
     pub(crate) fn set_prompt(&mut self, prompt: CommandBarPrompt) {
