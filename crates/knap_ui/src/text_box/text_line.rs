@@ -1,39 +1,18 @@
 use std::{error::Error, fmt::Display, ops::Range};
 
 use anyhow::Result;
-use knap_base::{
-    color::Color,
-    math::{Lossy, Vec2f},
-};
+use knap_base::math::{Lossy, Vec2f};
 use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
+
+use super::{TextColor, TextHighlights};
 
 // TODO: Refactor this into a separate module
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SearchDirection {
     Forward,
     Backward,
-}
-
-// TODO: Stub, reimplement in the future
-pub struct TextHighlights;
-
-impl TextHighlights {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    fn get_highlight_at(&self, byte_idx: usize) -> Option<TextColor> {
-        None
-    }
-}
-
-// TODO: This can be part of theme in the future
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TextColor {
-    foreground: Option<Color>,
-    background: Option<Color>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
