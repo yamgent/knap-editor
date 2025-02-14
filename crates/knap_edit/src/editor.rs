@@ -70,7 +70,7 @@ impl Editor {
                     return;
                 }
             };
-            self.view.replace_buffer(buffer);
+            self.view.replace_buffer(buffer, &filename);
             self.window.set_title(&filename).expect("able to set title");
         }
     }

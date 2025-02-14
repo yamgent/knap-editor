@@ -8,7 +8,7 @@ use knap_base::math::{ToUsize, Vec2u};
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::buffer::{Buffer, FileType};
+use crate::{buffer::Buffer, view::FileType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HighlightType {
@@ -214,8 +214,8 @@ impl HighlightInfo {
         }
     }
 
-    pub(crate) fn update_file_type(&mut self, buffer: &Buffer) {
-        self.file_type = buffer.file_type();
+    pub(crate) fn update_file_type(&mut self, buffer: &Buffer, file_type: FileType) {
+        self.file_type = file_type;
         self.regenerate_on_buffer_change(buffer);
     }
 

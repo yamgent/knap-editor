@@ -11,8 +11,25 @@ use crate::{
     status_bar::ViewStatus,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FileType {
+    Rust,
+    PlainText,
+}
+
+fn deduce_filetype<T: AsRef<str>>(filename: T) -> FileType {
+    if filename.as_ref().to_lowercase().ends_with(".rs") {
+        FileType::Rust
+    } else {
+        FileType::PlainText
+    }
+}
+
 pub(crate) struct View {
     bounds: Bounds2f,
+
+    filename: Option<String>,
+    file_type: FileType,
 
     buffer: Buffer,
 
@@ -40,6 +57,8 @@ impl View {
     pub(crate) fn new() -> Self {
         Self {
             buffer: Buffer::new(),
+            filename: None,
+            file_type: FileType::PlainText,
             bounds: Bounds2f::ZERO,
             caret_pos: Vec2u::ZERO,
             scroll_offset: Vec2u::ZERO,
@@ -50,22 +69,27 @@ impl View {
         }
     }
 
-    pub(crate) fn replace_buffer(&mut self, buffer: Buffer) {
+    pub(crate) fn replace_buffer<T: AsRef<str>>(&mut self, buffer: Buffer, filename: T) {
         self.buffer = buffer;
-        self.highlight_info.update_file_type(&self.buffer);
+        self.filename = Some(filename.as_ref().to_string());
+        self.file_type = deduce_filetype(filename);
+        self.highlight_info
+            .update_file_type(&self.buffer, self.file_type);
     }
 
     pub(crate) fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
-        self.buffer.change_filename(filename);
-        self.highlight_info.update_file_type(&self.buffer);
+        self.filename = Some(filename.as_ref().to_string());
+        self.file_type = deduce_filetype(filename);
+        self.highlight_info
+            .update_file_type(&self.buffer, self.file_type);
     }
 
     pub(crate) fn get_status(&self) -> ViewStatus {
         ViewStatus {
-            filename: self.buffer.get_filename(),
+            filename: self.filename.clone(),
             total_lines: self.buffer.get_total_lines(),
             is_dirty: self.buffer.get_is_dirty(),
-            file_type: self.buffer.file_type(),
+            file_type: self.file_type,
             caret_position: self.caret_pos,
         }
     }
@@ -428,12 +452,13 @@ impl View {
                 true
             }
             EditorCommand::WriteBufferToDisk => {
-                if self.buffer.is_untitled_file() {
-                    command_bar.set_prompt(CommandBarPrompt::SaveAs);
-                } else {
-                    match self.buffer.write_to_disk() {
+                match &self.filename {
+                    Some(filename) => match self.buffer.write_to_disk(filename) {
                         Ok(()) => message_bar.set_message("File saved successfully"),
                         Err(err) => message_bar.set_message(format!("Error writing file: {err:?}")),
+                    },
+                    None => {
+                        command_bar.set_prompt(CommandBarPrompt::SaveAs);
                     }
                 }
                 true

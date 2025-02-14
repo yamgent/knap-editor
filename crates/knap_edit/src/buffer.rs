@@ -10,34 +10,16 @@ use crate::{
     text_line::{InsertCharError, InsertCharResult, TextLine},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FileType {
-    Rust,
-    PlainText,
-}
-
-fn deduce_filetype<T: AsRef<str>>(filename: T) -> FileType {
-    if filename.as_ref().to_lowercase().ends_with(".rs") {
-        FileType::Rust
-    } else {
-        FileType::PlainText
-    }
-}
-
 pub(crate) struct Buffer {
     content: Vec<TextLine>,
-    filename: Option<String>,
     is_dirty: bool,
-    file_type: FileType,
 }
 
 impl Buffer {
     pub(crate) fn new() -> Self {
         Self {
             content: vec![],
-            filename: None,
             is_dirty: false,
-            file_type: FileType::PlainText,
         }
     }
 
@@ -46,45 +28,24 @@ impl Buffer {
 
         Ok(Self {
             content: content.lines().map(TextLine::new).collect(),
-            filename: Some(filename.as_ref().to_string()),
             is_dirty: false,
-            file_type: deduce_filetype(filename),
         })
     }
 
-    pub(crate) fn is_untitled_file(&self) -> bool {
-        self.filename.is_none()
-    }
-
-    pub(crate) fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
-        self.filename = Some(filename.as_ref().to_string());
-        self.file_type = deduce_filetype(filename);
-    }
-
-    pub(crate) fn write_to_disk(&mut self) -> Result<()> {
-        if let Some(filename) = &self.filename {
-            let mut file = File::create(filename)?;
-            self.content
-                .iter()
-                .map(|line| writeln!(file, "{line}"))
-                .find(Result::is_err)
-                .unwrap_or(Ok(()))?;
-            self.is_dirty = false;
-        }
+    pub(crate) fn write_to_disk<T: AsRef<str>>(&mut self, filename: T) -> Result<()> {
+        let mut file = File::create(filename.as_ref())?;
+        self.content
+            .iter()
+            .map(|line| writeln!(file, "{line}"))
+            .find(Result::is_err)
+            .unwrap_or(Ok(()))?;
+        self.is_dirty = false;
 
         Ok(())
     }
 
-    pub(crate) fn get_filename(&self) -> Option<String> {
-        self.filename.clone()
-    }
-
     pub(crate) fn get_is_dirty(&self) -> bool {
         self.is_dirty
-    }
-
-    pub(crate) fn file_type(&self) -> FileType {
-        self.file_type
     }
 
     pub(crate) fn get_line_len(&self, line_idx: usize) -> usize {
