@@ -4,7 +4,7 @@ use anyhow::Result;
 use knap_base::math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
-use super::{InsertCharError, InsertCharResult, TextHighlights, TextLine};
+use super::{InsertCharError, InsertCharResult, SearchDirection, TextHighlights, TextLine};
 
 pub struct TextBox {
     bounds: Bounds2f,
@@ -35,6 +35,9 @@ pub struct TextBox {
     /// x. Otherwise it would be very disorientating. That's the
     /// job of this variable.
     previous_line_caret_max_x: Option<u64>,
+
+    before_search_caret_pos: Option<Vec2u>,
+    before_search_scroll_offset: Option<Vec2u>,
 }
 
 impl TextBox {
@@ -47,6 +50,8 @@ impl TextBox {
             caret_pos: Vec2u::ZERO,
             scroll_offset: Vec2u::ZERO,
             previous_line_caret_max_x: None,
+            before_search_caret_pos: None,
+            before_search_scroll_offset: None,
         }
     }
 
@@ -394,6 +399,110 @@ impl TextBox {
 
     pub fn get_total_lines(&self) -> usize {
         self.contents.len()
+    }
+
+    fn find_in_contents<T: AsRef<str>>(
+        &self,
+        search: T,
+        start_pos: Vec2u,
+        search_direction: SearchDirection,
+    ) -> Option<Vec2u> {
+        if let Some(first_line) = self.contents.get(start_pos.y.to_usize()) {
+            let first_line_result = first_line
+                .find(&search, Some(start_pos.x.to_usize()), search_direction)
+                .map(|fragment_idx| Vec2u {
+                    x: fragment_idx.to_u64(),
+                    y: start_pos.y,
+                });
+
+            if first_line_result.is_some() {
+                return first_line_result;
+            }
+        }
+
+        match search_direction {
+            SearchDirection::Forward => self
+                .contents
+                .iter()
+                .enumerate()
+                .cycle()
+                .skip(start_pos.y.saturating_add(1).to_usize())
+                .take(self.contents.len().saturating_sub(1))
+                .find_map(|(line_idx, line)| {
+                    line.find(&search, None, search_direction)
+                        .map(|fragment_idx| Vec2u {
+                            x: fragment_idx.to_u64(),
+                            y: line_idx.to_u64(),
+                        })
+                }),
+            SearchDirection::Backward => self
+                .contents
+                .iter()
+                .enumerate()
+                .rev()
+                .cycle()
+                .skip(self.contents.len().saturating_sub(start_pos.y.to_usize()))
+                .take(self.contents.len().saturating_sub(1))
+                .find_map(|(line_idx, line)| {
+                    line.find(&search, None, search_direction)
+                        .map(|fragment_idx| Vec2u {
+                            x: fragment_idx.to_u64(),
+                            y: line_idx.to_u64(),
+                        })
+                }),
+        }
+    }
+
+    pub fn enter_search_mode(&mut self) {
+        self.before_search_caret_pos = Some(self.caret_pos);
+        self.before_search_scroll_offset = Some(self.scroll_offset);
+    }
+
+    pub fn exit_search_mode(&mut self, retain_search_caret_pos: bool) {
+        if retain_search_caret_pos {
+            self.before_search_caret_pos.take();
+            self.before_search_scroll_offset.take();
+        } else {
+            self.caret_pos = self
+                .before_search_caret_pos
+                .take()
+                .unwrap_or(self.caret_pos);
+
+            self.scroll_offset = self
+                .before_search_scroll_offset
+                .take()
+                .unwrap_or(self.scroll_offset);
+        }
+    }
+
+    pub fn find<T: AsRef<str>>(
+        &mut self,
+        search: T,
+        first_search: bool,
+        search_direction: SearchDirection,
+    ) {
+        if let Some(caret_pos) = self.find_in_contents(
+            &search,
+            if first_search {
+                self.before_search_caret_pos.unwrap_or(self.caret_pos)
+            } else {
+                Vec2u {
+                    x: match search_direction {
+                        SearchDirection::Forward => self
+                            .caret_pos
+                            .x
+                            .saturating_add(search.as_ref().len().to_u64()),
+                        SearchDirection::Backward => self.caret_pos.x,
+                    },
+                    y: self.caret_pos.y,
+                }
+            },
+            search_direction,
+        ) {
+            self.change_caret_xy(caret_pos);
+        } else if let Some(previous_caret_pos) = self.before_search_caret_pos {
+            self.change_caret_xy(previous_caret_pos);
+        }
     }
 
     pub fn render_line(
