@@ -4,7 +4,9 @@ use anyhow::Result;
 use knap_base::math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
-use super::{InsertCharError, InsertCharResult, SearchDirection, TextHighlights, TextLine};
+use super::{
+    InsertCharError, InsertCharResult, SearchDirection, TextHighlightLine, TextHighlights, TextLine,
+};
 
 pub struct TextBox {
     bounds: Bounds2f,
@@ -511,7 +513,7 @@ impl TextBox {
         line_idx: usize,
         screen_pos: Vec2f,
         text_offset_x: Range<u64>,
-        line_highlight: &TextHighlights,
+        line_highlight: &TextHighlightLine,
     ) {
         match self.contents.get(line_idx) {
             Some(line) => line.render_line(drawer, screen_pos, text_offset_x, line_highlight),
@@ -523,7 +525,7 @@ impl TextBox {
         }
     }
 
-    pub fn render(&self, drawer: &mut Drawer) {
+    pub fn render(&self, drawer: &mut Drawer, highlights: &TextHighlights) {
         if self.bounds.size.x * self.bounds.size.y > 0.0 {
             (0..self.bounds.size.y.lossy()).for_each(|y| {
                 let line_idx = self.scroll_offset.y.saturating_add(y).to_usize();
@@ -539,7 +541,9 @@ impl TextBox {
                             .scroll_offset
                             .x
                             .saturating_add(self.bounds.size.x.lossy())),
-                    &TextHighlights::new(),
+                    highlights
+                        .line_highlight(line_idx)
+                        .unwrap_or(&TextHighlightLine::new()),
                 );
             });
 

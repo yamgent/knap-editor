@@ -6,7 +6,7 @@ use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use super::{TextColor, TextHighlights};
+use super::{TextColor, TextHighlightLine};
 
 // TODO: Refactor this into a separate module
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -147,7 +147,7 @@ impl TextLine {
         drawer: &mut Drawer,
         screen_pos: Vec2f,
         text_offset_x: Range<u64>,
-        highlights: &TextHighlights,
+        highlights: &TextHighlightLine,
     ) {
         let mut current_x = 0;
         let mut fragment_iter = self.fragments.iter();

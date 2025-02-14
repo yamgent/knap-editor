@@ -1,5 +1,5 @@
 use knap_base::math::{Bounds2f, Lossy, Vec2f};
-use knap_ui::text_box::TextBox;
+use knap_ui::text_box::{TextBox, TextHighlights};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -87,7 +87,7 @@ impl CommandBar {
             let prompt = self.prompt.get_display();
             drawer.draw_text(self.bounds.pos, &prompt);
 
-            self.text_box.render(drawer);
+            self.text_box.render(drawer, &TextHighlights::new());
         }
     }
 
