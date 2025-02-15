@@ -2,7 +2,7 @@ use knap_base::math::{Bounds2f, Lossy, Vec2f};
 use knap_ui::text_box::{SearchDirection, TextBox, TextHighlights};
 use knap_window::drawer::Drawer;
 
-use crate::{commands::EditorCommand, message_bar::MessageBar, view::View};
+use crate::{code_view::CodeView, commands::EditorCommand, message_bar::MessageBar};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommandBarPrompt {
@@ -89,7 +89,7 @@ impl CommandBar {
         }
     }
 
-    fn on_input_updated(&self, view: &mut View) {
+    fn on_input_updated(&self, view: &mut CodeView) {
         if matches!(self.prompt, CommandBarPrompt::Search) {
             view.find(
                 self.text_box.get_entire_contents_as_string(),
@@ -99,7 +99,7 @@ impl CommandBar {
         }
     }
 
-    fn on_find_next(&self, view: &mut View) {
+    fn on_find_next(&self, view: &mut CodeView) {
         view.find(
             self.text_box.get_entire_contents_as_string(),
             false,
@@ -107,7 +107,7 @@ impl CommandBar {
         );
     }
 
-    fn on_find_previous(&self, view: &mut View) {
+    fn on_find_previous(&self, view: &mut CodeView) {
         view.find(
             self.text_box.get_entire_contents_as_string(),
             false,
@@ -121,7 +121,7 @@ impl CommandBar {
         &mut self,
         command: EditorCommand,
         message_bar: &mut MessageBar,
-        view: &mut View,
+        view: &mut CodeView,
     ) -> CommandBarExecuteResult {
         match command {
             EditorCommand::QuitAll

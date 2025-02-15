@@ -10,7 +10,7 @@ use knap_ui::text_box::{
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::view::FileType;
+use crate::code_view::FileType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HighlightType {

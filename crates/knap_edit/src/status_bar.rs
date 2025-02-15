@@ -1,7 +1,7 @@
 use knap_base::math::{Bounds2f, Lossy, Vec2u};
 use knap_window::drawer::Drawer;
 
-use crate::view::FileType;
+use crate::code_view::FileType;
 
 pub(crate) struct ViewStatus {
     pub filename: Option<String>,

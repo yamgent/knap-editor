@@ -4,11 +4,11 @@ use knap_base::math::{Bounds2f, Vec2f};
 use knap_window::{drawer::Drawer, window::Window};
 
 use crate::{
+    code_view::CodeView,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
     message_bar::MessageBar,
     status_bar::StatusBar,
-    view::View,
 };
 
 pub struct Editor {
@@ -20,7 +20,7 @@ pub struct Editor {
     /// quit the editor without saving a modified file
     block_quit_remaining_tries: usize,
 
-    view: View,
+    view: CodeView,
     status_bar: StatusBar,
     message_bar: MessageBar,
     command_bar: CommandBar,
@@ -33,7 +33,7 @@ impl Editor {
             window: Window::new(),
             drawer: Drawer::new(),
             block_quit_remaining_tries: 0,
-            view: View::new(),
+            view: CodeView::new(),
             status_bar: StatusBar::new(),
             message_bar: MessageBar::new(),
             command_bar: CommandBar::new(),
@@ -63,7 +63,7 @@ impl Editor {
         if let Some(filename) = std::env::args().nth(1) {
             let view_bounds = self.view.bounds();
 
-            match View::new_from_file(&filename) {
+            match CodeView::new_from_file(&filename) {
                 Ok(view) => {
                     self.view = view;
                     self.view.set_bounds(view_bounds);

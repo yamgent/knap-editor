@@ -27,7 +27,7 @@ fn deduce_filetype<T: AsRef<str>>(filename: T) -> FileType {
     }
 }
 
-pub(crate) struct View {
+pub(crate) struct CodeView {
     bounds: Bounds2f,
 
     filename: Option<String>,
@@ -38,7 +38,7 @@ pub(crate) struct View {
     highlight_info: HighlightInfo,
 }
 
-impl View {
+impl CodeView {
     pub(crate) fn new() -> Self {
         Self {
             filename: None,
