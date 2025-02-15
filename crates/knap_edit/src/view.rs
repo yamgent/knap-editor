@@ -1,13 +1,15 @@
-use knap_base::math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
+use std::{fs::File, io::Write};
+
+use anyhow::Result;
+use knap_base::math::Bounds2f;
+use knap_ui::text_box::{SearchDirection, TextBox};
 use knap_window::drawer::Drawer;
 
 use crate::{
-    buffer::Buffer,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
-    highlighter::{HighlightInfo, Highlights},
+    highlighter::HighlightInfo,
     message_bar::MessageBar,
-    search::SearchDirection,
     status_bar::ViewStatus,
 };
 
@@ -31,24 +33,7 @@ pub(crate) struct View {
     filename: Option<String>,
     file_type: FileType,
 
-    buffer: Buffer,
-
-    caret_pos: Vec2u,
-    scroll_offset: Vec2u,
-
-    /// When the caret moves between the lines on the y-axis
-    /// without changing the x position, editors tend to remember
-    /// the x pos of the starting line, so that when encountering
-    /// lines that are shorter than x (which would require the x
-    /// position to be changed, as the caret is no longer on a
-    /// valid position), the original x position is not lost when
-    /// the caret then goes to another line that is longer than
-    /// x. Otherwise it would be very disorientating. That's the
-    /// job of this variable.
-    previous_line_caret_max_x: Option<u64>,
-
-    before_search_caret_pos: Option<Vec2u>,
-    before_search_scroll_offset: Option<Vec2u>,
+    text_box: TextBox,
 
     highlight_info: HighlightInfo,
 }
@@ -56,201 +41,78 @@ pub(crate) struct View {
 impl View {
     pub(crate) fn new() -> Self {
         Self {
-            buffer: Buffer::new(),
             filename: None,
             file_type: FileType::PlainText,
+            text_box: TextBox::new(),
             bounds: Bounds2f::ZERO,
-            caret_pos: Vec2u::ZERO,
-            scroll_offset: Vec2u::ZERO,
-            previous_line_caret_max_x: None,
-            before_search_caret_pos: None,
-            before_search_scroll_offset: None,
             highlight_info: HighlightInfo::new(),
         }
     }
 
-    pub(crate) fn replace_buffer<T: AsRef<str>>(&mut self, buffer: Buffer, filename: T) {
-        self.buffer = buffer;
-        self.filename = Some(filename.as_ref().to_string());
-        self.file_type = deduce_filetype(filename);
-        self.highlight_info
-            .update_file_type(&self.buffer, self.file_type);
+    pub(crate) fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
+        let content = std::fs::read_to_string(filename.as_ref())?;
+        let mut text_box = TextBox::new();
+        text_box.set_contents(content);
+        text_box.set_is_dirty(false);
+
+        let filename = Some(filename.as_ref().to_string());
+        let file_type = deduce_filetype(filename.as_ref().expect("filename is not None"));
+        let mut highlight_info = HighlightInfo::new();
+        highlight_info.update_file_type(&text_box, file_type);
+
+        Ok(Self {
+            filename,
+            file_type,
+            text_box,
+            bounds: Bounds2f::ZERO,
+            highlight_info,
+        })
     }
 
     pub(crate) fn change_filename<T: AsRef<str>>(&mut self, filename: T) {
         self.filename = Some(filename.as_ref().to_string());
         self.file_type = deduce_filetype(filename);
         self.highlight_info
-            .update_file_type(&self.buffer, self.file_type);
+            .update_file_type(&self.text_box, self.file_type);
     }
 
     pub(crate) fn get_status(&self) -> ViewStatus {
         ViewStatus {
             filename: self.filename.clone(),
-            total_lines: self.buffer.get_total_lines(),
-            is_dirty: self.buffer.get_is_dirty(),
+            total_lines: self.text_box.get_total_lines(),
+            is_dirty: self.text_box.is_dirty(),
             file_type: self.file_type,
-            caret_position: self.caret_pos,
+            caret_position: self.text_box.caret_pos(),
         }
     }
 
-    fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> Vec2u {
-        Vec2u {
-            x: self
-                .buffer
-                .get_line_text_width(caret_pos.y.to_usize(), caret_pos.x.to_usize()),
-            y: caret_pos.y,
-        }
+    pub(crate) fn bounds(&self) -> Bounds2f {
+        self.bounds
     }
 
     pub(crate) fn set_bounds(&mut self, bounds: Bounds2f) {
         self.bounds = bounds;
-        self.adjust_scroll_to_caret_grid_pos();
+        self.text_box.set_bounds(bounds);
     }
 
     pub(crate) fn render(&self, drawer: &mut Drawer) {
-        (0..self.bounds.size.y.lossy()).for_each(|y| {
-            let line_idx = self.scroll_offset.y.saturating_add(y).to_usize();
-            self.buffer.render_line(
-                drawer,
-                line_idx,
-                Vec2f {
-                    x: self.bounds.pos.x,
-                    y: self.bounds.pos.y + y.lossy(),
-                },
-                self.scroll_offset.x
-                    ..(self
-                        .scroll_offset
-                        .x
-                        .saturating_add(self.bounds.size.x.lossy())),
-                self.highlight_info
-                    .line_highlight(line_idx)
-                    .unwrap_or(&Highlights::new()),
-            );
-        });
-
-        let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
-
-        let screen_cursor_pos = Vec2u {
-            x: <f64 as Lossy<u64>>::lossy(&self.bounds.pos.x)
-                .saturating_add(grid_cursor_pos.x.saturating_sub(self.scroll_offset.x)),
-            y: <f64 as Lossy<u64>>::lossy(&self.bounds.pos.y)
-                .saturating_add(grid_cursor_pos.y.saturating_sub(self.scroll_offset.y)),
-        };
-
-        drawer.draw_cursor(Vec2f {
-            x: screen_cursor_pos.x.lossy(),
-            y: screen_cursor_pos.y.lossy(),
-        });
-    }
-
-    fn adjust_scroll_to_caret_grid_pos(&mut self) {
-        let grid_cursor_pos = self.get_grid_pos_from_caret_pos(self.caret_pos);
-
-        if grid_cursor_pos.x < self.scroll_offset.x {
-            self.scroll_offset.x = grid_cursor_pos.x;
-        }
-
-        if grid_cursor_pos.y < self.scroll_offset.y {
-            self.scroll_offset.y = grid_cursor_pos.y;
-        }
-
-        if grid_cursor_pos.x
-            >= self
-                .scroll_offset
-                .x
-                .saturating_add(self.bounds.size.x.lossy())
-        {
-            self.scroll_offset.x = grid_cursor_pos
-                .x
-                .saturating_sub(self.bounds.size.x.lossy())
-                .saturating_add(1);
-        }
-
-        if grid_cursor_pos.y
-            >= self
-                .scroll_offset
-                .y
-                .saturating_add(self.bounds.size.y.lossy())
-        {
-            self.scroll_offset.y = grid_cursor_pos
-                .y
-                .saturating_sub(self.bounds.size.y.lossy())
-                .saturating_add(1);
-        }
-    }
-
-    /// See `Self::previous_line_caret_max_x` for more details about the purpose
-    /// of this function.
-    fn adjust_caret_x_on_caret_y_movement(&mut self) {
-        let line_len = self
-            .buffer
-            .get_line_len(self.caret_pos.y.to_usize())
-            .to_u64();
-
-        if self.caret_pos.x > line_len {
-            // x is not on a valid position, move it back
-            if self.previous_line_caret_max_x.is_none() {
-                self.previous_line_caret_max_x = Some(self.caret_pos.x);
-            }
-            self.caret_pos.x = line_len;
-        } else {
-            // check to see if we have previous memory of x
-            if let Some(previous_x) = self.previous_line_caret_max_x {
-                if previous_x > line_len {
-                    // previous entry still too far out...
-                    self.caret_pos.x = line_len;
-                } else {
-                    self.caret_pos.x = previous_x;
-                    self.previous_line_caret_max_x = None;
-                }
-            }
-        }
-    }
-
-    fn change_caret_x(&mut self, new_x: u64) {
-        self.caret_pos.x = new_x;
-        self.adjust_scroll_to_caret_grid_pos();
-        self.previous_line_caret_max_x.take();
-    }
-
-    fn change_caret_y(&mut self, new_y: u64) {
-        self.caret_pos.y = new_y;
-        self.adjust_caret_x_on_caret_y_movement();
-        self.adjust_scroll_to_caret_grid_pos();
-    }
-
-    fn change_caret_xy(&mut self, new_pos: Vec2u) {
-        self.caret_pos = new_pos;
-        self.adjust_scroll_to_caret_grid_pos();
-        self.previous_line_caret_max_x.take();
+        self.text_box
+            .render(drawer, self.highlight_info.text_highlight());
     }
 
     fn start_search(&mut self, command_bar: &mut CommandBar) {
-        self.before_search_caret_pos = Some(self.caret_pos);
-        self.before_search_scroll_offset = Some(self.scroll_offset);
-
+        self.text_box.enter_search_mode();
         command_bar.set_prompt(CommandBarPrompt::Search);
     }
 
     pub(crate) fn abort_search(&mut self) {
-        self.caret_pos = self
-            .before_search_caret_pos
-            .take()
-            .unwrap_or(self.caret_pos);
-
-        self.scroll_offset = self
-            .before_search_scroll_offset
-            .take()
-            .unwrap_or(self.scroll_offset);
-
-        self.highlight_info.clear_search_highlights(&self.buffer);
+        self.text_box.exit_search_mode(false);
+        self.highlight_info.clear_search_highlights(&self.text_box);
     }
 
     pub(crate) fn complete_search(&mut self) {
-        self.before_search_caret_pos.take();
-        self.before_search_scroll_offset.take();
-        self.highlight_info.clear_search_highlights(&self.buffer);
+        self.text_box.exit_search_mode(true);
+        self.highlight_info.clear_search_highlights(&self.text_box);
     }
 
     pub(crate) fn find<T: AsRef<str>>(
@@ -259,31 +121,20 @@ impl View {
         first_search: bool,
         search_direction: SearchDirection,
     ) {
-        if let Some(caret_pos) = self.buffer.find(
-            &search,
-            if first_search {
-                self.before_search_caret_pos.unwrap_or(self.caret_pos)
-            } else {
-                Vec2u {
-                    x: match search_direction {
-                        SearchDirection::Forward => self
-                            .caret_pos
-                            .x
-                            .saturating_add(search.as_ref().len().to_u64()),
-                        SearchDirection::Backward => self.caret_pos.x,
-                    },
-                    y: self.caret_pos.y,
-                }
-            },
-            search_direction,
-        ) {
-            self.change_caret_xy(caret_pos);
-        } else if let Some(previous_caret_pos) = self.before_search_caret_pos {
-            self.change_caret_xy(previous_caret_pos);
-        }
+        self.text_box.find(&search, first_search, search_direction);
+        self.highlight_info.regenerate_on_search_change(
+            &self.text_box,
+            search,
+            self.text_box.caret_pos(),
+        );
+    }
 
-        self.highlight_info
-            .regenerate_on_search_change(&self.buffer, search, self.caret_pos);
+    fn write_to_disk<T: AsRef<str>>(&mut self, filename: T) -> Result<()> {
+        let mut file = File::create(filename.as_ref())?;
+        writeln!(file, "{}", self.text_box.get_entire_contents_as_string())?;
+        self.text_box.set_is_dirty(false);
+
+        Ok(())
     }
 
     // splitting the function up doesn't change the readability much
@@ -296,164 +147,68 @@ impl View {
     ) -> bool {
         match command {
             EditorCommand::MoveCursorUp => {
-                self.change_caret_y(self.caret_pos.y.saturating_sub(1));
+                self.text_box.move_cursor_up();
                 true
             }
             EditorCommand::MoveCursorDown => {
-                self.change_caret_y(
-                    self.caret_pos
-                        .y
-                        .saturating_add(1)
-                        .clamp(0, self.buffer.get_total_lines().to_u64()),
-                );
+                self.text_box.move_cursor_down();
                 true
             }
             EditorCommand::MoveCursorLeft => {
-                if self.caret_pos.x == 0 {
-                    if self.caret_pos.y > 0 {
-                        self.change_caret_xy(Vec2u {
-                            x: self
-                                .buffer
-                                .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
-                                .to_u64(),
-                            y: self.caret_pos.y.saturating_sub(1),
-                        });
-                    } else {
-                        self.previous_line_caret_max_x.take();
-                    }
-                } else {
-                    self.change_caret_x(self.caret_pos.x.saturating_sub(1));
-                }
+                self.text_box.move_cursor_left();
                 true
             }
             EditorCommand::MoveCursorRight => {
-                let line_len = self
-                    .buffer
-                    .get_line_len(self.caret_pos.y.to_usize())
-                    .to_u64();
-
-                if self.caret_pos.x == line_len {
-                    if self.caret_pos.y < self.buffer.get_total_lines().to_u64() {
-                        self.change_caret_xy(Vec2u {
-                            x: 0,
-                            y: self.caret_pos.y.saturating_add(1),
-                        });
-                    } else {
-                        self.previous_line_caret_max_x.take();
-                    }
-                } else {
-                    self.change_caret_x(self.caret_pos.x.saturating_add(1));
-                }
+                self.text_box.move_cursor_right();
                 true
             }
             EditorCommand::MoveCursorUpOnePage => {
-                self.change_caret_y(self.caret_pos.y.saturating_sub(self.bounds.size.y.lossy()));
+                self.text_box.move_cursor_up_one_page();
                 true
             }
             EditorCommand::MoveCursorDownOnePage => {
-                self.change_caret_y(
-                    self.caret_pos
-                        .y
-                        .saturating_add(self.bounds.size.y.lossy())
-                        .clamp(0, self.buffer.get_total_lines().to_u64()),
-                );
+                self.text_box.move_cursor_down_one_page();
                 true
             }
             EditorCommand::MoveCursorToStartOfLine => {
-                self.change_caret_x(0);
+                self.text_box.move_cursor_to_start_of_line();
                 true
             }
             EditorCommand::MoveCursorToEndOfLine => {
-                self.change_caret_x(
-                    self.buffer
-                        .get_line_len(self.caret_pos.y.to_usize())
-                        .to_u64(),
-                );
+                self.text_box.move_cursor_to_end_of_line();
                 true
             }
             EditorCommand::InsertCharacter(ch) => {
-                match self.buffer.insert_character(
-                    self.caret_pos.y.to_usize(),
-                    self.caret_pos.x.to_usize(),
-                    ch,
-                ) {
-                    Ok(result) => {
-                        if result.line_len_increased {
-                            self.change_caret_x(self.caret_pos.x.saturating_add(1));
-                        }
-                        self.highlight_info
-                            .regenerate_on_buffer_change(&self.buffer);
-                        true
-                    }
-                    Err(..) => false,
+                if self.text_box.insert_character_at_cursor(ch).is_ok() {
+                    self.highlight_info
+                        .regenerate_on_buffer_change(&self.text_box);
+                    true
+                } else {
+                    false
                 }
             }
             EditorCommand::EraseCharacterBeforeCursor => {
-                if self.caret_pos.x > 0 {
-                    self.buffer.remove_character(
-                        self.caret_pos.y.to_usize(),
-                        self.caret_pos.x.saturating_sub(1).to_usize(),
-                    );
-                    self.highlight_info
-                        .regenerate_on_buffer_change(&self.buffer);
-
-                    self.change_caret_x(self.caret_pos.x.saturating_sub(1));
-                } else if self.caret_pos.y > 0 {
-                    let previous_line_len = self
-                        .buffer
-                        .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
-                        .to_u64();
-
-                    self.buffer
-                        .join_line_with_below_line(self.caret_pos.y.saturating_sub(1).to_usize());
-                    self.highlight_info
-                        .regenerate_on_buffer_change(&self.buffer);
-
-                    self.change_caret_xy(Vec2u {
-                        x: previous_line_len,
-                        y: self.caret_pos.y.saturating_sub(1),
-                    });
-                } else {
-                    self.previous_line_caret_max_x.take();
-                }
+                self.text_box.erase_character_before_cursor();
+                self.highlight_info
+                    .regenerate_on_buffer_change(&self.text_box);
                 true
             }
             EditorCommand::EraseCharacterAfterCursor => {
-                if self.caret_pos.x
-                    < self
-                        .buffer
-                        .get_line_len(self.caret_pos.y.to_usize())
-                        .to_u64()
-                {
-                    self.buffer
-                        .remove_character(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
-                    self.highlight_info
-                        .regenerate_on_buffer_change(&self.buffer);
-                } else if self.caret_pos.y < self.buffer.get_total_lines().to_u64() {
-                    self.buffer
-                        .join_line_with_below_line(self.caret_pos.y.to_usize());
-                    self.highlight_info
-                        .regenerate_on_buffer_change(&self.buffer);
-                }
-
-                self.previous_line_caret_max_x.take();
+                self.text_box.erase_character_after_cursor();
+                self.highlight_info
+                    .regenerate_on_buffer_change(&self.text_box);
                 true
             }
 
             EditorCommand::InsertNewline => {
-                self.buffer
-                    .insert_newline_at(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
+                self.text_box.insert_newline_at_cursor();
                 self.highlight_info
-                    .regenerate_on_buffer_change(&self.buffer);
-                self.change_caret_xy(Vec2u {
-                    x: 0,
-                    y: self.caret_pos.y.saturating_add(1),
-                });
+                    .regenerate_on_buffer_change(&self.text_box);
                 true
             }
             EditorCommand::WriteBufferToDisk => {
                 match &self.filename {
-                    Some(filename) => match self.buffer.write_to_disk(filename) {
+                    Some(filename) => match self.write_to_disk(filename.clone()) {
                         Ok(()) => message_bar.set_message("File saved successfully"),
                         Err(err) => message_bar.set_message(format!("Error writing file: {err:?}")),
                     },

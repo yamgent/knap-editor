@@ -4,7 +4,6 @@ use knap_base::math::{Bounds2f, Vec2f};
 use knap_window::{drawer::Drawer, window::Window};
 
 use crate::{
-    buffer::Buffer,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
     message_bar::MessageBar,
@@ -62,16 +61,19 @@ impl Editor {
 
     fn open_arg_file(&mut self) {
         if let Some(filename) = std::env::args().nth(1) {
-            let buffer = match Buffer::new_from_file(&filename) {
-                Ok(buffer) => buffer,
+            let view_bounds = self.view.bounds();
+
+            match View::new_from_file(&filename) {
+                Ok(view) => {
+                    self.view = view;
+                    self.view.set_bounds(view_bounds);
+                    self.window.set_title(&filename).expect("able to set title");
+                }
                 Err(err) => {
                     self.message_bar
                         .set_message(format!("Cannot load {filename}: {err}"));
-                    return;
                 }
             };
-            self.view.replace_buffer(buffer, &filename);
-            self.window.set_title(&filename).expect("able to set title");
         }
     }
 

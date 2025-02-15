@@ -19,7 +19,7 @@ pub struct TextBox {
     /// When this is true, the text box will attempt to
     /// ensure that the caret can only be on a single line.
     ///
-    /// However, if the TextBox's content is not single line,
+    /// However, if the `TextBox`'s content is not single line,
     /// the content will remain multi-line, and be rendered as such,
     /// but the caret will still be constrained to a single line.
     single_line_mode: bool,
@@ -83,6 +83,25 @@ impl TextBox {
 
     pub fn set_is_dirty(&mut self, is_dirty: bool) {
         self.is_dirty = is_dirty;
+    }
+
+    pub fn set_contents<T: AsRef<str>>(&mut self, contents: T) {
+        self.contents = contents.as_ref().lines().map(TextLine::new).collect();
+        self.is_dirty = true;
+
+        self.caret_pos.y = self.caret_pos.y.clamp(0, self.get_total_lines().to_u64());
+        self.caret_pos.x = self
+            .caret_pos
+            .x
+            .clamp(0, self.get_line_len(self.caret_pos.y.to_usize()).to_u64());
+        self.adjust_scroll_to_caret_grid_pos();
+        self.previous_line_caret_max_x.take();
+        self.before_search_caret_pos.take();
+        self.before_search_scroll_offset.take();
+    }
+
+    pub fn caret_pos(&self) -> Vec2u {
+        self.caret_pos
     }
 
     pub fn get_line_len(&self, line_idx: usize) -> usize {
@@ -384,12 +403,18 @@ impl TextBox {
         self.is_dirty = true;
     }
 
+    // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_entire_contents_as_string(&self) -> String {
         self.contents
             .iter()
-            .map(|line| line.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    // TODO: When we use a backend text object (like ropey), this method shouldn't be here
+    pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
+        self.contents.get(line_idx).map(ToString::to_string)
     }
 
     pub fn reset(&mut self) {
@@ -399,6 +424,7 @@ impl TextBox {
         self.is_dirty = false;
     }
 
+    // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_total_lines(&self) -> usize {
         self.contents.len()
     }

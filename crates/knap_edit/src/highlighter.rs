@@ -1,14 +1,16 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    ops::Range,
-};
+use std::{cell::RefCell, collections::HashSet, ops::Range};
 
-use knap_base::math::{ToUsize, Vec2u};
+use knap_base::{
+    color::Color,
+    math::{ToUsize, Vec2u},
+};
+use knap_ui::text_box::{
+    TextBox, TextColor, TextHighlightBlock, TextHighlightLine, TextHighlights,
+};
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{buffer::Buffer, view::FileType};
+use crate::view::FileType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HighlightType {
@@ -34,21 +36,8 @@ pub(crate) struct Highlights {
     highlights: Vec<Highlight>,
 }
 
-impl Highlights {
-    pub(crate) fn new() -> Self {
-        Self { highlights: vec![] }
-    }
-
-    pub(crate) fn get_highlight_at(&self, byte_idx: usize) -> Option<HighlightType> {
-        self.highlights
-            .iter()
-            .find(|highlight| highlight.range.contains(&byte_idx))
-            .map(|highlight| highlight.highlight_type)
-    }
-}
-
 pub(crate) struct HighlightInfo {
-    line_info: HashMap<usize, Highlights>,
+    text_highlight: TextHighlights,
     file_type: FileType,
 }
 
@@ -206,69 +195,126 @@ fn get_highlights_for_line<T: AsRef<str>>(
     Highlights { highlights }
 }
 
+fn map_highlights_to_text_highlight_line(highlights: Highlights) -> TextHighlightLine {
+    TextHighlightLine {
+        blocks: highlights
+            .highlights
+            .into_iter()
+            .map(|highlight| TextHighlightBlock {
+                // TODO: This needs to be changed to use a theme system
+                color: match highlight.highlight_type {
+                    HighlightType::SearchMatch => TextColor {
+                        foreground: Some(Color::BLACK),
+                        background: Some(Color::YELLOW),
+                    },
+                    HighlightType::SearchCursor => TextColor {
+                        foreground: Some(Color::BLACK),
+                        background: Some(Color::BLUE),
+                    },
+                    HighlightType::Number => TextColor {
+                        foreground: Some(Color::DARK_RED),
+                        background: None,
+                    },
+                    HighlightType::Keyword => TextColor {
+                        foreground: Some(Color::BLUE),
+                        background: None,
+                    },
+                    HighlightType::BasicType => TextColor {
+                        foreground: Some(Color::GREEN),
+                        background: None,
+                    },
+                    HighlightType::EnumLiteral => TextColor {
+                        foreground: Some(Color::CYAN),
+                        background: None,
+                    },
+                    HighlightType::Character | HighlightType::LifetimeSpecifier => TextColor {
+                        foreground: Some(Color::DARK_YELLOW),
+                        background: None,
+                    },
+                    HighlightType::Comment => TextColor {
+                        foreground: Some(Color::DARK_GREEN),
+                        background: None,
+                    },
+                },
+                range: highlight.range,
+            })
+            .collect(),
+    }
+}
+
 impl HighlightInfo {
     pub(crate) fn new() -> Self {
         Self {
-            line_info: HashMap::new(),
+            text_highlight: TextHighlights::new(),
             file_type: FileType::PlainText,
         }
     }
 
-    pub(crate) fn update_file_type(&mut self, buffer: &Buffer, file_type: FileType) {
+    pub(crate) fn update_file_type(&mut self, text_box: &TextBox, file_type: FileType) {
         self.file_type = file_type;
-        self.regenerate_on_buffer_change(buffer);
+        self.regenerate_on_buffer_change(text_box);
     }
 
+    // TODO: When we use a backend text object (like ropey), this shouldn't take in text_box
     pub(crate) fn regenerate_on_search_change<T: AsRef<str>>(
         &mut self,
-        buffer: &Buffer,
+        text_box: &TextBox,
         search_text: T,
         search_cursor_pos: Vec2u,
     ) {
-        self.line_info = (0..buffer.get_total_lines())
-            .filter_map(|line_idx| buffer.get_raw_line(line_idx))
-            .enumerate()
-            .map(|(line_idx, line)| {
-                let search_cursor_x_pos = if line_idx == search_cursor_pos.y.to_usize() {
-                    Some(search_cursor_pos.x)
-                } else {
-                    None
-                };
-                (
-                    line_idx,
+        self.text_highlight = TextHighlights {
+            lines: (0..text_box.get_total_lines())
+                .filter_map(|line_idx| text_box.get_raw_line(line_idx))
+                .enumerate()
+                .map(|(line_idx, line)| {
+                    let search_cursor_x_pos = if line_idx == search_cursor_pos.y.to_usize() {
+                        Some(search_cursor_pos.x)
+                    } else {
+                        None
+                    };
+                    (
+                        line_idx,
+                        get_highlights_for_line(
+                            line,
+                            self.file_type,
+                            Some(&search_text.as_ref().to_string()),
+                            search_cursor_x_pos,
+                        ),
+                    )
+                })
+                .map(|(line_idx, highlights)| {
+                    (line_idx, map_highlights_to_text_highlight_line(highlights))
+                })
+                .collect(),
+        }
+    }
+
+    // TODO: When we use a backend text object (like ropey), this shouldn't take in text_box
+    pub(crate) fn regenerate_on_buffer_change(&mut self, text_box: &TextBox) {
+        self.text_highlight = TextHighlights {
+            lines: (0..text_box.get_total_lines())
+                .filter_map(|line_idx| text_box.get_raw_line(line_idx))
+                .map(|line| {
                     get_highlights_for_line(
                         line,
                         self.file_type,
-                        Some(&search_text.as_ref().to_string()),
-                        search_cursor_x_pos,
-                    ),
-                )
-            })
-            .collect();
+                        // buffer change should not happen during search for our current
+                        // implementation, so safe to pass in None for now
+                        None,
+                        None,
+                    )
+                })
+                .map(map_highlights_to_text_highlight_line)
+                .enumerate()
+                .collect(),
+        }
     }
 
-    pub(crate) fn regenerate_on_buffer_change(&mut self, buffer: &Buffer) {
-        self.line_info = (0..buffer.get_total_lines())
-            .filter_map(|line_idx| buffer.get_raw_line(line_idx))
-            .map(|line| {
-                get_highlights_for_line(
-                    line,
-                    self.file_type,
-                    // buffer change should not happen during search for our current
-                    // implementation, so safe to pass in None for now
-                    None,
-                    None,
-                )
-            })
-            .enumerate()
-            .collect();
+    pub(crate) fn clear_search_highlights(&mut self, text_box: &TextBox) {
+        self.regenerate_on_buffer_change(text_box);
     }
 
-    pub(crate) fn clear_search_highlights(&mut self, buffer: &Buffer) {
-        self.regenerate_on_buffer_change(buffer);
-    }
-
-    pub(crate) fn line_highlight(&self, line_idx: usize) -> Option<&Highlights> {
-        self.line_info.get(&line_idx)
+    pub(crate) fn text_highlight(&self) -> &TextHighlights {
+        &self.text_highlight
     }
 }

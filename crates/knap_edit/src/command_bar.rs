@@ -1,10 +1,8 @@
 use knap_base::math::{Bounds2f, Lossy, Vec2f};
-use knap_ui::text_box::{TextBox, TextHighlights};
+use knap_ui::text_box::{SearchDirection, TextBox, TextHighlights};
 use knap_window::drawer::Drawer;
 
-use crate::{
-    commands::EditorCommand, message_bar::MessageBar, search::SearchDirection, view::View,
-};
+use crate::{commands::EditorCommand, message_bar::MessageBar, view::View};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommandBarPrompt {
