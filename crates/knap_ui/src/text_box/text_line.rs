@@ -8,7 +8,6 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{TextColor, TextHighlightLine};
 
-// TODO: Refactor this into a separate module
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SearchDirection {
     Forward,
