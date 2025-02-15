@@ -1,10 +1,7 @@
-mod buffer;
+mod code_view;
 mod command_bar;
 mod commands;
 pub mod editor;
 mod highlighter;
 mod message_bar;
-mod search;
 mod status_bar;
-mod text_line;
-mod view;

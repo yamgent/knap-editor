@@ -4,12 +4,11 @@ use knap_base::math::{Bounds2f, Vec2f};
 use knap_window::{drawer::Drawer, window::Window};
 
 use crate::{
-    buffer::Buffer,
+    code_view::CodeView,
     command_bar::{CommandBar, CommandBarPrompt},
     commands::EditorCommand,
     message_bar::MessageBar,
     status_bar::StatusBar,
-    view::View,
 };
 
 pub struct Editor {
@@ -21,7 +20,7 @@ pub struct Editor {
     /// quit the editor without saving a modified file
     block_quit_remaining_tries: usize,
 
-    view: View,
+    view: CodeView,
     status_bar: StatusBar,
     message_bar: MessageBar,
     command_bar: CommandBar,
@@ -34,7 +33,7 @@ impl Editor {
             window: Window::new(),
             drawer: Drawer::new(),
             block_quit_remaining_tries: 0,
-            view: View::new(),
+            view: CodeView::new(),
             status_bar: StatusBar::new(),
             message_bar: MessageBar::new(),
             command_bar: CommandBar::new(),
@@ -62,16 +61,19 @@ impl Editor {
 
     fn open_arg_file(&mut self) {
         if let Some(filename) = std::env::args().nth(1) {
-            let buffer = match Buffer::new_from_file(&filename) {
-                Ok(buffer) => buffer,
+            let view_bounds = self.view.bounds();
+
+            match CodeView::new_from_file(&filename) {
+                Ok(view) => {
+                    self.view = view;
+                    self.view.set_bounds(view_bounds);
+                    self.window.set_title(&filename).expect("able to set title");
+                }
                 Err(err) => {
                     self.message_bar
                         .set_message(format!("Cannot load {filename}: {err}"));
-                    return;
                 }
             };
-            self.view.replace_buffer(buffer);
-            self.window.set_title(&filename).expect("able to set title");
         }
     }
 

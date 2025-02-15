@@ -1,18 +1,18 @@
 use std::{error::Error, fmt::Display, ops::Range};
 
 use anyhow::Result;
-use knap_base::{
-    color::Color,
-    math::{Lossy, Vec2f},
-};
+use knap_base::math::{Lossy, Vec2f};
 use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    highlighter::{HighlightType, Highlights},
-    search::SearchDirection,
-};
+use super::{TextColor, TextHighlightLine};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum SearchDirection {
+    Forward,
+    Backward,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum GraphemeWidth {
@@ -41,7 +41,7 @@ pub(crate) struct TextLine {
     string: String,
 }
 
-pub(crate) struct InsertCharResult {
+pub struct InsertCharResult {
     /// There could be scenarios where an insertion of
     /// a new character results in grapheme clusters
     /// merging together. In those situations, the line
@@ -56,7 +56,7 @@ pub(crate) struct InsertCharResult {
 }
 
 #[derive(Debug)]
-pub(crate) enum InsertCharError {
+pub enum InsertCharError {
     InvalidPosition,
 }
 
@@ -146,7 +146,7 @@ impl TextLine {
         drawer: &mut Drawer,
         screen_pos: Vec2f,
         text_offset_x: Range<u64>,
-        highlights: &Highlights,
+        highlights: &TextHighlightLine,
     ) {
         let mut current_x = 0;
         let mut fragment_iter = self.fragments.iter();
@@ -185,7 +185,7 @@ impl TextLine {
         if !chars_to_render.is_empty() {
             let grouped_strings = chars_to_render.into_iter().fold(
                 vec![],
-                |mut acc: Vec<(String, u64, Option<HighlightType>)>, current| {
+                |mut acc: Vec<(String, u64, Option<TextColor>)>, current| {
                     let mut insert_new = true;
 
                     if let Some(last_entry) = acc.last_mut() {
@@ -209,20 +209,10 @@ impl TextLine {
                     let next_x_offset = x_offset.saturating_add(string_width);
                     let (foreground, background) = match highlight_type {
                         None => (None, None),
-                        Some(HighlightType::SearchMatch) => {
-                            (Some(Color::BLACK), Some(Color::YELLOW))
-                        }
-                        Some(HighlightType::SearchCursor) => {
-                            (Some(Color::BLACK), Some(Color::BLUE))
-                        }
-                        Some(HighlightType::Number) => (Some(Color::DARK_RED), None),
-                        Some(HighlightType::Keyword) => (Some(Color::BLUE), None),
-                        Some(HighlightType::BasicType) => (Some(Color::GREEN), None),
-                        Some(HighlightType::EnumLiteral) => (Some(Color::CYAN), None),
-                        Some(HighlightType::Character | HighlightType::LifetimeSpecifier) => {
-                            (Some(Color::DARK_YELLOW), None)
-                        }
-                        Some(HighlightType::Comment) => (Some(Color::DARK_GREEN), None),
+                        Some(TextColor {
+                            foreground,
+                            background,
+                        }) => (foreground, background),
                     };
 
                     drawer.draw_colored_text(
