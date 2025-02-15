@@ -533,7 +533,7 @@ impl TextBox {
         }
     }
 
-    pub fn render_line(
+    fn render_line(
         &self,
         drawer: &mut Drawer,
         line_idx: usize,
