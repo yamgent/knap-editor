@@ -1,5 +1,8 @@
 use knap_base::math::{Bounds2f, Lossy, Vec2f};
-use knap_ui::text_box::{SearchDirection, TextBox, TextHighlights};
+use knap_ui::{
+    text_box::{TextBox, TextHighlights},
+    text_buffer::SearchDirection,
+};
 use knap_window::drawer::Drawer;
 
 use crate::{code_view::CodeView, commands::EditorCommand, message_bar::MessageBar};
