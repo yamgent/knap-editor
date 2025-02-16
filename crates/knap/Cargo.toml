@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-knap_edit = { path = "../knap_edit" }
+knap_core = { path = "../knap_core" }
 
 [lints]
 workspace = true
