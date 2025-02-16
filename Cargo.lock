@@ -74,7 +74,7 @@ dependencies = [
 name = "knap"
 version = "0.0.0"
 dependencies = [
- "knap_edit",
+ "knap_core",
 ]
 
 [[package]]
@@ -82,7 +82,7 @@ name = "knap_base"
 version = "0.0.0"
 
 [[package]]
-name = "knap_edit"
+name = "knap_core"
 version = "0.0.0"
 dependencies = [
  "anyhow",
