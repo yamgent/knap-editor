@@ -1,18 +1,11 @@
-use std::{error::Error, fmt::Display, ops::Range};
+use std::{cmp::Ordering, fmt::Display, ops::Range};
 
-use anyhow::Result;
 use knap_base::math::{Lossy, Vec2f};
 use knap_window::drawer::Drawer;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use super::{TextColor, TextHighlightLine};
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum SearchDirection {
-    Forward,
-    Backward,
-}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum GraphemeWidth {
@@ -36,37 +29,11 @@ struct TextFragment {
     start_byte_index: usize,
 }
 
+// TODO: This now only contains rendering logic, refactor it as such
 pub(crate) struct TextLine {
     fragments: Vec<TextFragment>,
     string: String,
 }
-
-pub struct InsertCharResult {
-    /// There could be scenarios where an insertion of
-    /// a new character results in grapheme clusters
-    /// merging together. In those situations, the line
-    /// length would not increase, and this value would
-    /// be false. Therefore the caret position should
-    /// not change.
-    ///
-    /// Otherwise, if there's a length increase, then
-    /// the caret position should change, and this
-    /// value would be true.
-    pub line_len_increased: bool,
-}
-
-#[derive(Debug)]
-pub enum InsertCharError {
-    InvalidPosition,
-}
-
-impl Display for InsertCharError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
-impl Error for InsertCharError {}
 
 fn get_grapheme_render_replacement<T: AsRef<str>>(grapheme: T) -> Option<(char, GraphemeWidth)> {
     let grapheme = grapheme.as_ref();
@@ -231,113 +198,23 @@ impl TextLine {
         }
     }
 
-    pub(crate) fn insert_character(
-        &mut self,
-        fragment_idx: usize,
-        character: char,
-    ) -> Result<InsertCharResult, InsertCharError> {
-        if fragment_idx > self.fragments.len() {
-            Err(InsertCharError::InvalidPosition)
-        } else {
-            let old_fragments_len = self.fragments.len();
-
-            let mut new_string = self
+    // TODO: Maybe create a FragmentIdx type?
+    pub(crate) fn get_fragment_idx_from_byte_idx(&self, byte_idx: usize) -> Option<usize> {
+        match byte_idx.cmp(&self.string.len()) {
+            Ordering::Less => self
                 .fragments
                 .iter()
-                .take(fragment_idx)
-                .map(|fragment| fragment.grapheme.clone())
-                .collect::<String>();
-            new_string.push(character);
-            new_string.extend(
-                self.fragments
-                    .iter()
-                    .skip(fragment_idx)
-                    .map(|fragment| fragment.grapheme.clone()),
-            );
-
-            *self = Self::new(new_string);
-
-            Ok(InsertCharResult {
-                line_len_increased: self.fragments.len() > old_fragments_len,
-            })
+                .position(|fragment| fragment.start_byte_index >= byte_idx),
+            Ordering::Equal => Some(self.fragments.len()),
+            Ordering::Greater => None,
         }
     }
 
-    pub(crate) fn remove_character(&mut self, fragment_idx: usize) {
-        if fragment_idx < self.fragments.len() {
-            let new_string = self
-                .fragments
-                .iter()
-                .enumerate()
-                .filter(|(idx, _)| *idx != fragment_idx)
-                .map(|(_, fragment)| fragment.grapheme.clone())
-                .collect::<String>();
-            *self = Self::new(new_string);
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn split_off(&mut self, fragment_idx: usize) -> Self {
-        let left = self
-            .fragments
-            .iter()
-            .take(fragment_idx)
-            .map(|fragment| fragment.grapheme.clone())
-            .collect::<String>();
-        let right = self
-            .fragments
-            .iter()
-            .skip(fragment_idx)
-            .map(|fragment| fragment.grapheme.clone())
-            .collect::<String>();
-
-        *self = Self::new(left);
-        Self::new(right)
-    }
-
-    fn get_fragment_idx_from_byte_idx(&self, byte_idx: usize) -> Option<usize> {
-        self.fragments
-            .iter()
-            .position(|fragment| fragment.start_byte_index >= byte_idx)
-    }
-
-    fn get_byte_idx_from_fragment_idx(&self, fragment_idx: usize) -> Option<usize> {
-        self.fragments
-            .get(fragment_idx)
-            .map(|fragment| fragment.start_byte_index)
-    }
-
-    pub(crate) fn find<T: AsRef<str>>(
-        &self,
-        search: T,
-        start_from_fragment_idx: Option<usize>,
-        search_direction: SearchDirection,
-    ) -> Option<usize> {
-        let start_byte_idx = match start_from_fragment_idx {
-            Some(start_from_fragment_idx) => {
-                self.get_byte_idx_from_fragment_idx(start_from_fragment_idx)?
-            }
-            None => match search_direction {
-                SearchDirection::Forward => 0,
-                SearchDirection::Backward => self.string.len(),
-            },
-        };
-        let all_indices = self
-            .string
-            .match_indices(search.as_ref())
-            .map(|entries| entries.0)
-            .collect::<Vec<_>>();
-
-        match search_direction {
-            SearchDirection::Forward => all_indices
-                .iter()
-                .find(|byte_idx| **byte_idx >= start_byte_idx)
-                .and_then(|byte_idx| self.get_fragment_idx_from_byte_idx(*byte_idx)),
-            SearchDirection::Backward => all_indices
-                .iter()
-                .rev()
-                .find(|byte_idx| **byte_idx < start_byte_idx)
-                .and_then(|byte_idx| self.get_fragment_idx_from_byte_idx(*byte_idx)),
+    pub(crate) fn get_byte_idx_from_fragment_idx(&self, fragment_idx: usize) -> Option<usize> {
+        match fragment_idx.cmp(&self.fragments.len()) {
+            Ordering::Less => Some(self.fragments[fragment_idx].start_byte_index),
+            Ordering::Equal => Some(self.string.len()),
+            Ordering::Greater => None,
         }
     }
 }

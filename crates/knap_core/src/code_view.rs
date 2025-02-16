@@ -2,7 +2,7 @@ use std::{fs::File, io::Write};
 
 use anyhow::Result;
 use knap_base::math::Bounds2f;
-use knap_ui::text_box::{SearchDirection, TextBox};
+use knap_ui::{text_box::TextBox, text_buffer::SearchDirection};
 use knap_window::drawer::Drawer;
 
 use crate::{
