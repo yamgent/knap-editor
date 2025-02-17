@@ -323,7 +323,7 @@ impl TextBox {
         ch: char,
     ) -> Result<InsertCharResult, InsertCharError> {
         // TODO: This is not efficient
-        let target_line_render = if self.caret_pos.y == self.contents.lines_len().to_u64() {
+        let target_line_render = if self.caret_pos.y == self.contents.total_lines().to_u64() {
             TextLine::new("")
         } else {
             match self.contents.line(self.caret_pos.y.to_usize()) {
@@ -412,17 +412,21 @@ impl TextBox {
             self.previous_line_caret_max_x.take();
             result
         } else if self.caret_pos.y > 0 && !self.single_line_mode {
-            let previous_line_len = self
+            let previous_line_fragments_len = self
                 .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                 .to_u64();
 
-            if matches!(
-                self.contents
-                    .join_line_with_below_line(self.caret_pos.y.saturating_sub(1).to_usize()),
-                JoinLineResult::Joined
-            ) {
+            if let Some(previous_line_len) = self
+                .contents
+                .line_len(self.caret_pos.y.saturating_sub(1).to_usize())
+            {
+                self.contents.remove_character_at_pos(TextBufferPos {
+                        line: self.caret_pos.y.saturating_sub(1).to_usize(),
+                        byte: previous_line_len,
+                    }).expect("previous line should exist, and it is legal to remove the pos right after the last character");
+
                 self.change_caret_xy(Vec2u {
-                    x: previous_line_len,
+                    x: previous_line_fragments_len,
                     y: self.caret_pos.y.saturating_sub(1),
                 });
 
@@ -457,11 +461,19 @@ impl TextBox {
 
             result
         } else if self.caret_pos.y < self.get_total_lines().to_u64() && !self.single_line_mode {
-            if matches!(
-                self.contents
-                    .join_line_with_below_line(self.caret_pos.y.to_usize()),
-                JoinLineResult::Joined
-            ) {
+            let line_len = self
+                .contents
+                .line_len(self.caret_pos.y.to_usize())
+                .expect("line should exist");
+
+            if self
+                .contents
+                .remove_character_at_pos(TextBufferPos {
+                    line: self.caret_pos.y.to_usize(),
+                    byte: line_len,
+                })
+                .is_ok()
+            {
                 self.is_dirty = true;
             }
 
@@ -503,7 +515,10 @@ impl TextBox {
             },
         };
 
-        let insert_successful = self.contents.insert_newline_at_pos(buffer_pos).is_ok();
+        let insert_successful = self
+            .contents
+            .insert_character_at_pos(buffer_pos, '\n')
+            .is_ok();
 
         self.change_caret_xy(Vec2u {
             x: 0,
@@ -522,7 +537,7 @@ impl TextBox {
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
-        self.contents.line(line_idx).map(ToString::to_string)
+        self.contents.line(line_idx)
     }
 
     pub fn reset(&mut self) {
@@ -534,7 +549,7 @@ impl TextBox {
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_total_lines(&self) -> usize {
-        self.contents.lines_len()
+        self.contents.total_lines()
     }
 
     fn find_in_contents<T: AsRef<str>>(
@@ -544,7 +559,7 @@ impl TextBox {
         search_direction: SearchDirection,
     ) -> Option<Vec2u> {
         // TODO: This is not efficient
-        let target_line_render = if start_pos.y == self.contents.lines_len().to_u64() {
+        let target_line_render = if start_pos.y == self.contents.total_lines().to_u64() {
             TextLine::new("")
         } else {
             match self.contents.line(start_pos.y.to_usize()) {
