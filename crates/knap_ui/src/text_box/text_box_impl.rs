@@ -5,7 +5,7 @@ use knap_base::math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
 use crate::text_buffer::{
-    InsertCharError, JoinLineResult, RemoveCharError, SearchDirection, TextBufferPos, VecTextBuffer,
+    InsertCharError, RemoveCharError, SearchDirection, TextBuffer, TextBufferPos,
 };
 
 use super::{text_line::TextLine, TextHighlightLine, TextHighlights};
@@ -39,10 +39,10 @@ pub struct RemoveCharResult {
     pub line_len_decreased: bool,
 }
 
-pub struct TextBox {
+pub struct TextBox<B: TextBuffer> {
     bounds: Bounds2f,
 
-    contents: VecTextBuffer,
+    contents: B,
     is_dirty: bool,
 
     /// Best effort single line mode.
@@ -73,11 +73,11 @@ pub struct TextBox {
     before_search_scroll_offset: Option<Vec2u>,
 }
 
-impl TextBox {
-    pub fn new() -> Self {
+impl<B: TextBuffer> TextBox<B> {
+    pub fn new(buffer: B) -> Self {
         Self {
             bounds: Bounds2f::ZERO,
-            contents: VecTextBuffer::new(),
+            contents: buffer,
             is_dirty: false,
             single_line_mode: false,
             caret_pos: Vec2u::ZERO,
@@ -92,10 +92,10 @@ impl TextBox {
     ///
     /// See `Self::single_line_mode` for more details regarding
     /// the "best effort" part.
-    pub fn new_single_line_text_box() -> Self {
+    pub fn new_single_line_text_box(buffer: B) -> Self {
         Self {
             single_line_mode: true,
-            ..Self::new()
+            ..Self::new(buffer)
         }
     }
 
@@ -117,7 +117,7 @@ impl TextBox {
     }
 
     pub fn set_contents<T: AsRef<str>>(&mut self, contents: T) {
-        self.contents.set_contents(contents);
+        self.contents.set_contents(contents.as_ref());
         self.is_dirty = true;
 
         self.caret_pos.y = self.caret_pos.y.clamp(0, self.get_total_lines().to_u64());
@@ -532,19 +532,12 @@ impl TextBox {
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_entire_contents_as_string(&self) -> String {
-        self.contents.to_string()
+        self.contents.contents()
     }
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
         self.contents.line(line_idx)
-    }
-
-    pub fn reset(&mut self) {
-        self.contents = VecTextBuffer::new();
-        self.caret_pos = Vec2u::ZERO;
-        self.scroll_offset = Vec2u::ZERO;
-        self.is_dirty = false;
     }
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
@@ -578,7 +571,7 @@ impl TextBox {
         };
 
         self.contents
-            .find(search, buffer_pos, search_direction)
+            .find(search.as_ref(), buffer_pos, search_direction)
             .map(|result| {
                 let final_line_render = TextLine::new(
                     self.contents

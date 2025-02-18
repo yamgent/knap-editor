@@ -2,7 +2,10 @@ use std::{fs::File, io::Write};
 
 use anyhow::Result;
 use knap_base::math::Bounds2f;
-use knap_ui::{text_box::TextBox, text_buffer::SearchDirection};
+use knap_ui::{
+    text_box::TextBox,
+    text_buffer::{SearchDirection, VecTextBuffer},
+};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -33,9 +36,9 @@ pub(crate) struct CodeView {
     filename: Option<String>,
     file_type: FileType,
 
-    text_box: TextBox,
+    text_box: TextBox<VecTextBuffer>,
 
-    highlight_info: HighlightInfo,
+    highlight_info: HighlightInfo<VecTextBuffer>,
 }
 
 impl CodeView {
@@ -43,7 +46,7 @@ impl CodeView {
         Self {
             filename: None,
             file_type: FileType::PlainText,
-            text_box: TextBox::new(),
+            text_box: TextBox::new(VecTextBuffer::new()),
             bounds: Bounds2f::ZERO,
             highlight_info: HighlightInfo::new(),
         }
@@ -51,7 +54,7 @@ impl CodeView {
 
     pub(crate) fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
         let content = std::fs::read_to_string(filename.as_ref())?;
-        let mut text_box = TextBox::new();
+        let mut text_box = TextBox::new(VecTextBuffer::new());
         text_box.set_contents(content);
         text_box.set_is_dirty(false);
 
