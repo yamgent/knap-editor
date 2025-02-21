@@ -20,6 +20,12 @@ impl RopeTextBuffer {
     pub fn new() -> Self {
         Self { rope: Rope::new() }
     }
+
+    fn char_idx(&self, buffer_pos: TextBufferPos) -> usize {
+        let line_byte = self.rope.line_to_byte(buffer_pos.line);
+        let char_byte = line_byte.saturating_add(buffer_pos.byte);
+        self.rope.byte_to_char(char_byte)
+    }
 }
 
 impl TextBuffer for RopeTextBuffer {
@@ -129,7 +135,36 @@ impl TextBuffer for RopeTextBuffer {
         start_pos: TextBufferPos,
         search_direction: SearchDirection,
     ) -> Option<TextBufferPos> {
-        // TODO: Implement
-        todo!()
+        let search_chars_len = search.chars().count();
+        let start_char_idx = self.char_idx(start_pos);
+
+        let substring_matches_search = |char_idx: &usize| {
+            self.rope
+                .slice(char_idx..&char_idx.saturating_add(search_chars_len))
+                == search
+        };
+
+        match search_direction {
+            SearchDirection::Forward => (start_char_idx
+                ..self.rope.len_chars().saturating_sub(search_chars_len))
+                .find(substring_matches_search)
+                .or_else(|| (0..start_char_idx).find(substring_matches_search)),
+            SearchDirection::Backward => (0..start_char_idx)
+                .rev()
+                .find(substring_matches_search)
+                .or_else(|| {
+                    (start_char_idx..self.rope.len_chars().saturating_sub(search_chars_len))
+                        .rev()
+                        .find(substring_matches_search)
+                }),
+        }
+        .map(|result_char_idx| {
+            let line = self.rope.char_to_line(result_char_idx);
+            let byte = self
+                .rope
+                .char_to_byte(result_char_idx)
+                .saturating_sub(self.rope.line_to_byte(line));
+            TextBufferPos { line, byte }
+        })
     }
 }
