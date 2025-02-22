@@ -79,11 +79,10 @@ impl TextBuffer for RopeTextBuffer {
         pos: TextBufferPos,
         ch: char,
     ) -> Result<(), InsertCharError> {
-        // TODO: This method can crash if we insert characters beyond the last line in the editor,
-        // but it is actually legal to do so.
         match pos.line.cmp(&self.rope.len_lines()) {
             Ordering::Greater => Err(InsertCharError::InvalidLinePosition),
             Ordering::Equal => {
+                self.rope.insert_char(self.rope.len_chars(), '\n');
                 self.rope.insert_char(self.rope.len_chars(), ch);
                 Ok(())
             }
@@ -97,7 +96,9 @@ impl TextBuffer for RopeTextBuffer {
 
                 let char_idx = self.rope.byte_to_char(char_byte);
 
-                if char_idx >= self.rope.line_to_char(pos.line.saturating_add(1)) {
+                if char_idx >= self.rope.line_to_char(pos.line.saturating_add(1))
+                    && pos.line.saturating_add(1) != self.rope.len_lines()
+                {
                     return Err(InsertCharError::InvalidBytePosition);
                 }
 
@@ -166,5 +167,43 @@ impl TextBuffer for RopeTextBuffer {
                 .saturating_sub(self.rope.line_to_byte(line));
             TextBufferPos { line, byte }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_inserting_characters_at_last_line() {
+        {
+            let mut buffer = RopeTextBuffer {
+                rope: Rope::from_str("Line 1\nLine 2\nLine 3"),
+            };
+
+            {
+                let result =
+                    buffer.insert_character_at_pos(TextBufferPos { line: 3, byte: 0 }, 'X');
+                assert_eq!(result, Ok(()));
+                assert_eq!(buffer.contents(), "Line 1\nLine 2\nLine 3\nX");
+            }
+
+            {
+                let result =
+                    buffer.insert_character_at_pos(TextBufferPos { line: 3, byte: 1 }, 'Y');
+                assert_eq!(result, Ok(()));
+                assert_eq!(buffer.contents(), "Line 1\nLine 2\nLine 3\nXY");
+            }
+        }
+
+        {
+            let mut buffer = RopeTextBuffer {
+                rope: Rope::from_str("Line 1\nLine 2\nLine 3\n"),
+            };
+
+            let result = buffer.insert_character_at_pos(TextBufferPos { line: 3, byte: 0 }, 'X');
+            assert_eq!(result, Ok(()));
+            assert_eq!(buffer.contents(), "Line 1\nLine 2\nLine 3\nX");
+        }
     }
 }
