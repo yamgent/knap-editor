@@ -8,7 +8,7 @@ use crate::text_buffer::{
     InsertCharError, RemoveCharError, SearchDirection, TextBuffer, TextBufferPos,
 };
 
-use super::{text_line::TextLine, TextHighlightLine, TextHighlights};
+use super::{TextHighlightLine, TextHighlights, text_line::TextLine};
 
 pub struct InsertCharResult {
     /// There could be scenarios where an insertion of
@@ -412,6 +412,18 @@ impl<B: TextBuffer> TextBox<B> {
             self.previous_line_caret_max_x.take();
             result
         } else if self.caret_pos.y > 0 && !self.single_line_mode {
+            if self.caret_pos.y == self.contents.total_lines().to_u64() {
+                // TODO: this part exist because right now our cursor can actually go
+                // beyond the last line (in order to allow insert beyond the last line),
+                // but that design will no longer make sense when we introduce vim motions.
+                // At that point, we should revisit this code, and perhaps remove this
+                // special case.
+                self.previous_line_caret_max_x.take();
+                return Ok(RemoveCharResult {
+                    line_len_decreased: false,
+                });
+            }
+
             let previous_line_fragments_len = self
                 .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                 .to_u64();
