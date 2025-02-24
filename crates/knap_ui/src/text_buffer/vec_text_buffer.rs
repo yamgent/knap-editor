@@ -96,8 +96,12 @@ impl TextBuffer for VecTextBuffer {
             self.insert_newline_at_pos(pos)
         } else {
             if pos.line == self.text.len() {
-                self.text.push(ch.to_string());
-                Ok(())
+                if pos.byte == 0 {
+                    self.text.push(ch.to_string());
+                    Ok(())
+                } else {
+                    Err(InsertCharError::InvalidBytePosition)
+                }
             } else {
                 match self.text.get_mut(pos.line) {
                     Some(line) => {
@@ -192,5 +196,138 @@ impl TextBuffer for VecTextBuffer {
                     })
                 }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_contents() {
+        let mut buffer = VecTextBuffer::new();
+        buffer.set_contents("Hello\nWorld!");
+        assert_eq!(buffer.contents(), "Hello\nWorld!");
+    }
+
+    #[test]
+    fn test_line() {
+        let buffer = VecTextBuffer {
+            text: vec!["Hello".to_string(), "World!".to_string()],
+        };
+
+        assert_eq!(buffer.line(0), Some("Hello".to_string()));
+        assert_eq!(buffer.line(1), Some("World!".to_string()));
+        assert_eq!(buffer.line(2), None);
+    }
+
+    #[test]
+    fn test_line_len() {
+        let buffer = VecTextBuffer {
+            text: vec!["Hello".to_string(), "World!".to_string()],
+        };
+
+        assert_eq!(buffer.line_len(0), Some(5));
+        assert_eq!(buffer.line_len(1), Some(6));
+        assert_eq!(buffer.line_len(2), None);
+    }
+
+    #[test]
+    fn test_total_lines() {
+        let buffer = VecTextBuffer {
+            text: vec!["Hello".to_string(), "World!".to_string()],
+        };
+
+        assert_eq!(buffer.total_lines(), 2);
+    }
+
+    #[test]
+    fn test_insert_character_at_pos() {
+        let mut buffer = VecTextBuffer::new();
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 0, byte: 0 }, 'a');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "a");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 0, byte: 1 }, 'b');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "ab");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 0, byte: 2 }, 'c');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abc");
+        assert_eq!(buffer.total_lines(), 1);
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 0, byte: 3 }, '\n');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abc\n");
+        assert_eq!(buffer.total_lines(), 2);
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 1, byte: 0 }, 'd');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abc\nd");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 1, byte: 1 }, 'e');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abc\nde");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 1, byte: 1 }, 'f');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abc\ndfe");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 1, byte: 2 }, 'g');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abc\ndfge");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 1, byte: 0 }, 'h');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abc\nhdfge");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 0, byte: 3 }, 'i');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abci\nhdfge");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 0, byte: 10 }, 'z');
+        assert_eq!(result, Err(InsertCharError::InvalidBytePosition));
+        assert_eq!(buffer.contents(), "abci\nhdfge");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 10, byte: 0 }, 'z');
+        assert_eq!(result, Err(InsertCharError::InvalidLinePosition));
+        assert_eq!(buffer.contents(), "abci\nhdfge");
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 2, byte: 1 }, 'z');
+        assert_eq!(result, Err(InsertCharError::InvalidBytePosition));
+        assert_eq!(buffer.contents(), "abci\nhdfge");
+        assert_eq!(buffer.total_lines(), 2);
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 2, byte: 0 }, 'j');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "abci\nhdfge\nj");
+        assert_eq!(buffer.total_lines(), 3);
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 0, byte: 2 }, '\n');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "ab\nci\nhdfge\nj");
+        assert_eq!(buffer.total_lines(), 4);
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 3, byte: 1 }, '\n');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "ab\nci\nhdfge\nj\n");
+        assert_eq!(buffer.total_lines(), 5);
+
+        let result = buffer.insert_character_at_pos(TextBufferPos { line: 4, byte: 0 }, '\n');
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "ab\nci\nhdfge\nj\n\n");
+        assert_eq!(buffer.total_lines(), 6);
+    }
+
+    #[test]
+    fn test_remove_character_at_pos() {
+        todo!()
+    }
+
+    #[test]
+    fn test_find() {
+        todo!()
     }
 }
