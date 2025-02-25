@@ -155,7 +155,7 @@ impl TextBuffer for VecTextBuffer {
                     SearchDirection::Backward => {
                         let end_byte = start_pos
                             .byte
-                            .saturating_add(search.len())
+                            .saturating_add(search.len().saturating_sub(1))
                             .clamp(0, first_line.len());
                         first_line[..end_byte]
                             .rfind(search)
@@ -488,6 +488,13 @@ mod tests {
 
         let result = buffer.find(
             "this",
+            TextBufferPos { line: 0, byte: 21 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
+
+        let result = buffer.find(
+            "this",
             TextBufferPos { line: 0, byte: 20 },
             SearchDirection::Backward,
         );
@@ -498,7 +505,7 @@ mod tests {
             TextBufferPos { line: 0, byte: 19 },
             SearchDirection::Backward,
         );
-        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 0 }));
 
         let result = buffer.find(
             "this",
@@ -517,7 +524,7 @@ mod tests {
 
         let result = buffer.find(
             "this",
-            TextBufferPos { line: 2, byte: 3 },
+            TextBufferPos { line: 2, byte: 4 },
             SearchDirection::Backward,
         );
         assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
@@ -532,7 +539,7 @@ mod tests {
 
         let result = buffer.find(
             "is",
-            TextBufferPos { line: 0, byte: 1 },
+            TextBufferPos { line: 0, byte: 2 },
             SearchDirection::Backward,
         );
         assert_eq!(result, Some(TextBufferPos { line: 2, byte: 9 }));
