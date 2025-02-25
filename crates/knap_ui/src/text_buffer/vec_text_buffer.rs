@@ -143,23 +143,28 @@ impl TextBuffer for VecTextBuffer {
     ) -> Option<TextBufferPos> {
         if let Some(first_line) = self.text.get(start_pos.line) {
             if start_pos.byte < first_line.len() {
-                let first_line_result =
-                    match search_direction {
-                        SearchDirection::Forward => {
-                            first_line[start_pos.byte..]
-                                .find(search)
-                                .map(|byte| TextBufferPos {
-                                    line: start_pos.line,
-                                    byte: start_pos.byte.saturating_add(byte),
-                                })
-                        }
-                        SearchDirection::Backward => first_line[..start_pos.byte]
+                let first_line_result = match search_direction {
+                    SearchDirection::Forward => {
+                        first_line[start_pos.byte..]
+                            .find(search)
+                            .map(|byte| TextBufferPos {
+                                line: start_pos.line,
+                                byte: start_pos.byte.saturating_add(byte),
+                            })
+                    }
+                    SearchDirection::Backward => {
+                        let end_byte = start_pos
+                            .byte
+                            .saturating_add(search.len())
+                            .clamp(0, first_line.len());
+                        first_line[..end_byte]
                             .rfind(search)
                             .map(|byte| TextBufferPos {
                                 line: start_pos.line,
                                 byte,
-                            }),
-                    };
+                            })
+                    }
+                };
 
                 if first_line_result.is_some() {
                     return first_line_result;
@@ -323,11 +328,116 @@ mod tests {
 
     #[test]
     fn test_remove_character_at_pos() {
-        todo!()
+        let mut buffer = VecTextBuffer::new();
+        buffer.set_contents("Hello\nWorld!\nAnother\nLine");
+
+        // delete first character of line
+        let result = buffer.remove_character_at_pos(TextBufferPos { line: 0, byte: 0 });
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "ello\nWorld!\nAnother\nLine");
+
+        // delete newline character, resulting in a join
+        let result = buffer.remove_character_at_pos(TextBufferPos { line: 0, byte: 4 });
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "elloWorld!\nAnother\nLine");
+
+        // delete last character of line
+        let result = buffer.remove_character_at_pos(TextBufferPos { line: 0, byte: 9 });
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "elloWorld\nAnother\nLine");
+
+        // fail to delete beyond last line of character (including newline)
+        let result = buffer.remove_character_at_pos(TextBufferPos { line: 0, byte: 10 });
+        assert_eq!(result, Err(RemoveCharError::InvalidBytePosition));
+        assert_eq!(buffer.contents(), "elloWorld\nAnother\nLine");
+
+        // fail todelete non-existent line
+        let result = buffer.remove_character_at_pos(TextBufferPos { line: 3, byte: 0 });
+        assert_eq!(result, Err(RemoveCharError::InvalidLinePosition));
+        assert_eq!(buffer.contents(), "elloWorld\nAnother\nLine");
+
+        // delete character in the middle of the line
+        let result = buffer.remove_character_at_pos(TextBufferPos { line: 2, byte: 2 });
+        assert_eq!(result, Ok(()));
+        assert_eq!(buffer.contents(), "elloWorld\nAnother\nLie");
     }
 
     #[test]
     fn test_find() {
-        todo!()
+        let mut buffer = VecTextBuffer::new();
+        buffer.set_contents("this is a text and this is his cat.\nthe next line contains the history.\nand this is the last line.");
+
+        // normal search on the same line
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 0, byte: 0 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 0 }));
+
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 0, byte: 1 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
+
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 0, byte: 19 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
+
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 0, byte: 20 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
+
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 0, byte: 19 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
+
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 0, byte: 18 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 0 }));
+
+        // jump to a different line
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 0, byte: 20 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 2, byte: 4 }));
+
+        let result = buffer.find(
+            "this",
+            TextBufferPos { line: 2, byte: 3 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 19 }));
+
+        // wrap around
+        let result = buffer.find(
+            "is",
+            TextBufferPos { line: 2, byte: 10 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 0, byte: 2 }));
+
+        let result = buffer.find(
+            "is",
+            TextBufferPos { line: 0, byte: 1 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, Some(TextBufferPos { line: 2, byte: 9 }));
     }
 }
