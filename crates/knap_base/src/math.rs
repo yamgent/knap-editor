@@ -1,4 +1,4 @@
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Vec2u {
     pub x: u64,
     pub y: u64,
@@ -12,7 +12,7 @@ impl Vec2u {
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct Vec2f {
     pub x: f64,
     pub y: f64,
@@ -22,7 +22,7 @@ impl Vec2f {
     pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
 }
 
-#[derive(Default, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct Bounds2f {
     pub pos: Vec2f,
     pub size: Vec2f,
