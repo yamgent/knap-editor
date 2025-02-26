@@ -136,8 +136,8 @@ pub mod buffer_tests {
         // empty
         {
             let buffer = new_buffer_fn();
-
-            assert_eq!(buffer.line(0), None);
+            assert_eq!(buffer.line(0), Some("".to_string()));
+            assert_eq!(buffer.line(1), None);
         }
     }
 
@@ -161,8 +161,8 @@ pub mod buffer_tests {
         // empty
         {
             let buffer = new_buffer_fn();
-
-            assert_eq!(buffer.line_len(0), None);
+            assert_eq!(buffer.line_len(0), Some(0));
+            assert_eq!(buffer.line_len(1), None);
         }
     }
 
@@ -182,8 +182,7 @@ pub mod buffer_tests {
         // empty
         {
             let buffer = new_buffer_fn();
-
-            assert_eq!(buffer.total_lines(), 0);
+            assert_eq!(buffer.total_lines(), 1);
         }
     }
 
@@ -330,6 +329,10 @@ pub mod buffer_tests {
         // fail to delete in empty buffer
         buffer.set_contents("");
         let result = buffer.remove_character_at_pos(TextBufferPos { line: 0, byte: 0 });
+        assert_eq!(result, Err(RemoveCharError::InvalidBytePosition));
+        assert_eq!(buffer.contents(), "");
+
+        let result = buffer.remove_character_at_pos(TextBufferPos { line: 1, byte: 0 });
         assert_eq!(result, Err(RemoveCharError::InvalidLinePosition));
         assert_eq!(buffer.contents(), "");
     }

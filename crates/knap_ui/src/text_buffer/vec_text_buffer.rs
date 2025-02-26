@@ -21,7 +21,9 @@ pub struct VecTextBuffer {
 
 impl VecTextBuffer {
     pub fn new() -> Self {
-        Self { text: vec![] }
+        Self {
+            text: vec!["".to_string()],
+        }
     }
 
     fn insert_newline_at_pos(&mut self, pos: TextBufferPos) -> Result<(), InsertCharError> {
@@ -72,7 +74,11 @@ impl TextBuffer for VecTextBuffer {
     }
 
     fn set_contents(&mut self, contents: &str) {
-        self.text = contents.lines().map(ToString::to_string).collect();
+        self.text = if contents.is_empty() {
+            vec!["".to_string()]
+        } else {
+            contents.lines().map(ToString::to_string).collect()
+        };
     }
 
     fn line(&self, line_idx: usize) -> Option<String> {
@@ -125,10 +131,10 @@ impl TextBuffer for VecTextBuffer {
                     line.remove(pos.byte);
                     Ok(())
                 }
-                Ordering::Equal => {
-                    self.join_line_with_below_line(pos.line);
-                    Ok(())
-                }
+                Ordering::Equal => match self.join_line_with_below_line(pos.line) {
+                    JoinLineResult::Joined => Ok(()),
+                    JoinLineResult::NotJoined => Err(RemoveCharError::InvalidBytePosition),
+                },
                 Ordering::Greater => Err(RemoveCharError::InvalidBytePosition),
             },
             None => Err(RemoveCharError::InvalidLinePosition),
@@ -230,6 +236,7 @@ mod tests {
         {
             let mut buffer = VecTextBuffer::new();
             buffer.set_contents("");
+            assert_eq!(buffer.text, vec![""]);
             assert_eq!(buffer.contents(), "");
         }
     }

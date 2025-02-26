@@ -54,11 +54,13 @@ impl TextBuffer for RopeTextBuffer {
 
     fn line_len(&self, line_idx: usize) -> Option<usize> {
         if line_idx < self.rope.len_lines() {
-            let last_char_is_newline = self.rope.char(
-                self.rope
-                    .line_to_char(line_idx.saturating_add(1))
-                    .saturating_sub(1),
-            ) == '\n';
+            let last_char_pos = self
+                .rope
+                .line_to_char(line_idx.saturating_add(1))
+                .saturating_sub(1);
+
+            let last_char_is_newline =
+                last_char_pos < self.rope.len_chars() && self.rope.char(last_char_pos) == '\n';
             Some(
                 self.rope
                     .line(line_idx)
@@ -82,9 +84,13 @@ impl TextBuffer for RopeTextBuffer {
         match pos.line.cmp(&self.rope.len_lines()) {
             Ordering::Greater => Err(InsertCharError::InvalidLinePosition),
             Ordering::Equal => {
-                self.rope.insert_char(self.rope.len_chars(), '\n');
-                self.rope.insert_char(self.rope.len_chars(), ch);
-                Ok(())
+                if pos.byte == 0 {
+                    self.rope.insert_char(self.rope.len_chars(), '\n');
+                    self.rope.insert_char(self.rope.len_chars(), ch);
+                    Ok(())
+                } else {
+                    Err(InsertCharError::InvalidBytePosition)
+                }
             }
             Ordering::Less => {
                 let line_byte = self.rope.line_to_byte(pos.line);
@@ -173,6 +179,32 @@ impl TextBuffer for RopeTextBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_set_contents() {
+        // normal
+        {
+            let mut buffer = RopeTextBuffer::new();
+            buffer.set_contents("Hello\nWorld!\n\nThe End");
+            assert_eq!(buffer.rope, Rope::from_str("Hello\nWorld!\n\nThe End"));
+            assert_eq!(buffer.contents(), "Hello\nWorld!\n\nThe End");
+        }
+
+        // empty
+        {
+            let mut buffer = RopeTextBuffer::new();
+            buffer.set_contents("");
+            assert_eq!(buffer.rope, Rope::from_str(""));
+            assert_eq!(buffer.contents(), "");
+        }
+    }
+
+    #[test]
+    fn test_standard_text_buffer_tests() {
+        use crate::text_buffer::buffer_tests::do_standard_text_buffer_tests;
+
+        do_standard_text_buffer_tests(&|| RopeTextBuffer::new());
+    }
 
     #[test]
     fn test_inserting_characters_at_last_line() {
