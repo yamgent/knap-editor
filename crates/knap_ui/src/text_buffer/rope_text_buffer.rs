@@ -65,7 +65,7 @@ impl TextBuffer for RopeTextBuffer {
                 self.rope
                     .line(line_idx)
                     .len_bytes()
-                    .saturating_sub(if last_char_is_newline { 1 } else { 0 }),
+                    .saturating_sub(if last_char_is_newline { "\n".len() } else { 0 }),
             )
         } else {
             None

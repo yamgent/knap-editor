@@ -22,7 +22,7 @@ pub struct VecTextBuffer {
 impl VecTextBuffer {
     pub fn new() -> Self {
         Self {
-            text: vec!["".to_string()],
+            text: vec![String::new()],
         }
     }
 
@@ -75,7 +75,7 @@ impl TextBuffer for VecTextBuffer {
 
     fn set_contents(&mut self, contents: &str) {
         self.text = if contents.is_empty() {
-            vec!["".to_string()]
+            vec![String::new()]
         } else {
             contents.lines().map(ToString::to_string).collect()
         };
@@ -100,26 +100,24 @@ impl TextBuffer for VecTextBuffer {
     ) -> Result<(), InsertCharError> {
         if ch == '\n' {
             self.insert_newline_at_pos(pos)
-        } else {
-            if pos.line == self.text.len() {
-                if pos.byte == 0 {
-                    self.text.push(ch.to_string());
-                    Ok(())
-                } else {
-                    Err(InsertCharError::InvalidBytePosition)
-                }
+        } else if pos.line == self.text.len() {
+            if pos.byte == 0 {
+                self.text.push(ch.to_string());
+                Ok(())
             } else {
-                match self.text.get_mut(pos.line) {
-                    Some(line) => {
-                        if pos.byte <= line.len() {
-                            line.insert(pos.byte, ch);
-                            Ok(())
-                        } else {
-                            Err(InsertCharError::InvalidBytePosition)
-                        }
+                Err(InsertCharError::InvalidBytePosition)
+            }
+        } else {
+            match self.text.get_mut(pos.line) {
+                Some(line) => {
+                    if pos.byte <= line.len() {
+                        line.insert(pos.byte, ch);
+                        Ok(())
+                    } else {
+                        Err(InsertCharError::InvalidBytePosition)
                     }
-                    None => Err(InsertCharError::InvalidLinePosition),
                 }
+                None => Err(InsertCharError::InvalidLinePosition),
             }
         }
     }

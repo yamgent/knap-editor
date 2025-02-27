@@ -216,21 +216,31 @@ impl CommandBar {
                 }
             }
             EditorCommand::EraseCharacterBeforeCursor => {
-                self.text_box.erase_character_before_cursor();
-                self.on_input_updated(view);
-
-                CommandBarExecuteResult {
-                    is_command_handled: true,
-                    submitted_data: None,
+                if self.text_box.erase_character_before_cursor().is_ok() {
+                    self.on_input_updated(view);
+                    CommandBarExecuteResult {
+                        is_command_handled: true,
+                        submitted_data: None,
+                    }
+                } else {
+                    CommandBarExecuteResult {
+                        is_command_handled: false,
+                        submitted_data: None,
+                    }
                 }
             }
             EditorCommand::EraseCharacterAfterCursor => {
-                self.text_box.erase_character_after_cursor();
-                self.on_input_updated(view);
-
-                CommandBarExecuteResult {
-                    is_command_handled: true,
-                    submitted_data: None,
+                if self.text_box.erase_character_after_cursor().is_ok() {
+                    self.on_input_updated(view);
+                    CommandBarExecuteResult {
+                        is_command_handled: true,
+                        submitted_data: None,
+                    }
+                } else {
+                    CommandBarExecuteResult {
+                        is_command_handled: false,
+                        submitted_data: None,
+                    }
                 }
             }
             EditorCommand::Dismiss => {

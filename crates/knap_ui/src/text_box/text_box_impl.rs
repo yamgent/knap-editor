@@ -576,10 +576,7 @@ impl<B: TextBuffer> TextBox<B> {
         // TODO: This logic can be further refactored (it is copied and slightly modifiedacross multiple functions)
         let buffer_pos = TextBufferPos {
             line: start_pos.y.to_usize(),
-            byte: match target_line_render.get_byte_idx_from_fragment_idx(start_pos.x.to_usize()) {
-                Some(column) => column,
-                None => return None,
-            },
+            byte: target_line_render.get_byte_idx_from_fragment_idx(start_pos.x.to_usize())?,
         };
 
         self.contents
