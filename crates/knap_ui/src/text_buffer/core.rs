@@ -461,6 +461,56 @@ pub mod buffer_tests {
             SearchDirection::Backward,
         );
         assert_eq!(result, None);
+
+        // illegal cursor position
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 0, byte: 1 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, None);
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 0, byte: 2 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, None);
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 0, byte: 1 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, None);
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 0, byte: 2 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, None);
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 1, byte: 0 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, None);
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 2, byte: 0 },
+            SearchDirection::Forward,
+        );
+        assert_eq!(result, None);
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 1, byte: 0 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, None);
+        let result = empty_buffer.find(
+            "nothing to search",
+            TextBufferPos { line: 2, byte: 0 },
+            SearchDirection::Backward,
+        );
+        assert_eq!(result, None);
     }
 
     pub fn do_standard_text_buffer_tests<B, F>(new_buffer_fn: &F)

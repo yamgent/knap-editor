@@ -142,6 +142,14 @@ impl TextBuffer for RopeTextBuffer {
         start_pos: TextBufferPos,
         search_direction: SearchDirection,
     ) -> Option<TextBufferPos> {
+        if start_pos.line >= self.total_lines() {
+            return None;
+        }
+
+        if start_pos.byte >= self.line_len(start_pos.line).unwrap_or(0) {
+            return None;
+        }
+
         let search_chars_len = search.chars().count();
         let start_char_idx = self.char_idx(start_pos);
 
