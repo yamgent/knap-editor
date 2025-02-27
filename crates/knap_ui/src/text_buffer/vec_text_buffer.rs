@@ -223,7 +223,7 @@ mod tests {
                 vec![
                     "Hello".to_string(),
                     "World!".to_string(),
-                    "".to_string(),
+                    String::new(),
                     "The End".to_string()
                 ]
             );

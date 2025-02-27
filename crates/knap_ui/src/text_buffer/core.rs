@@ -128,7 +128,7 @@ pub(crate) mod buffer_tests {
 
             assert_eq!(buffer.line(0), Some("Hello".to_string()));
             assert_eq!(buffer.line(1), Some("World!".to_string()));
-            assert_eq!(buffer.line(2), Some("".to_string()));
+            assert_eq!(buffer.line(2), Some(String::new()));
             assert_eq!(buffer.line(3), Some("The End".to_string()));
             assert_eq!(buffer.line(4), None);
         }
@@ -136,7 +136,7 @@ pub(crate) mod buffer_tests {
         // empty
         {
             let buffer = new_buffer_fn();
-            assert_eq!(buffer.line(0), Some("".to_string()));
+            assert_eq!(buffer.line(0), Some(String::new()));
             assert_eq!(buffer.line(1), None);
         }
     }
@@ -337,6 +337,8 @@ pub(crate) mod buffer_tests {
         assert_eq!(buffer.contents(), "");
     }
 
+    // this is a test, so it is ok to have a lot of lines
+    #[allow(clippy::too_many_lines)]
     fn test_find<B, F>(new_buffer_fn: F)
     where
         B: TextBuffer,
