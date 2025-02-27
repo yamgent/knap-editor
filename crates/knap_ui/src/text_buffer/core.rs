@@ -113,7 +113,7 @@ pub trait TextBuffer {
 }
 
 #[cfg(test)]
-pub mod buffer_tests {
+pub(crate) mod buffer_tests {
     use super::*;
 
     fn test_line<B, F>(new_buffer_fn: F)
@@ -513,7 +513,7 @@ pub mod buffer_tests {
         assert_eq!(result, None);
     }
 
-    pub fn do_standard_text_buffer_tests<B, F>(new_buffer_fn: &F)
+    pub(crate) fn do_standard_text_buffer_tests<B, F>(new_buffer_fn: &F)
     where
         B: TextBuffer,
         F: Fn() -> B,
