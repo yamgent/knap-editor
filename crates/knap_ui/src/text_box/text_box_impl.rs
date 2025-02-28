@@ -30,8 +30,8 @@ pub struct RemoveCharResult {
     /// of a grapheme cluster, instead of a complete
     /// removal of the cluster. In those situations,
     /// the line length would not decrease, and this
-    /// value would false. Therefore, the caret position
-    /// should not change.
+    /// value would be false. Therefore, the caret
+    /// position should not change.
     ///
     /// Otherwise, if there's a length decrease, then
     /// the caret position should change, and this
@@ -332,7 +332,7 @@ impl<B: TextBuffer> TextBox<B> {
             }
         };
 
-        // TODO: This logic can be further refactored (it is copied and slightly modifiedacross multiple functions)
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
         let buffer_pos = TextBufferPos {
             line: self.caret_pos.y.to_usize(),
             byte: match target_line_render
@@ -371,7 +371,7 @@ impl<B: TextBuffer> TextBox<B> {
             None => return Err(RemoveCharError::InvalidLinePosition),
         };
 
-        // TODO: This logic can be further refactored (it is copied and slightly modifiedacross multiple functions)
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
         let buffer_pos = TextBufferPos {
             line: line_idx,
             byte: match target_line_render.get_byte_idx_from_fragment_idx(fragment_idx) {
@@ -516,7 +516,7 @@ impl<B: TextBuffer> TextBox<B> {
             None => TextLine::new(""),
         };
 
-        // TODO: This logic can be further refactored (it is copied and slightly modifiedacross multiple functions)
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
         let buffer_pos = TextBufferPos {
             line: self.caret_pos.y.to_usize(),
             byte: match target_line_render
@@ -573,7 +573,7 @@ impl<B: TextBuffer> TextBox<B> {
             }
         };
 
-        // TODO: This logic can be further refactored (it is copied and slightly modifiedacross multiple functions)
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
         let buffer_pos = TextBufferPos {
             line: start_pos.y.to_usize(),
             byte: target_line_render.get_byte_idx_from_fragment_idx(start_pos.x.to_usize())?,
