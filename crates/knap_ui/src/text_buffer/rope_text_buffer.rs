@@ -142,10 +142,10 @@ impl TextBuffer for RopeTextBuffer {
         start_pos: TextBufferPos,
         search_direction: SearchDirection,
     ) -> Option<TextBufferPos> {
+        // check that the start_pos is not an invalid position
         if start_pos.line >= self.total_lines() {
             return None;
         }
-
         if start_pos.byte >= self.line_len(start_pos.line).unwrap_or(0) {
             return None;
         }
@@ -159,19 +159,18 @@ impl TextBuffer for RopeTextBuffer {
                 == search
         };
 
+        let mut after_start_pos =
+            start_char_idx..self.rope.len_chars().saturating_sub(search_chars_len);
+        let mut before_start_pos = 0..start_char_idx;
+
         match search_direction {
-            SearchDirection::Forward => (start_char_idx
-                ..self.rope.len_chars().saturating_sub(search_chars_len))
+            SearchDirection::Forward => after_start_pos
                 .find(substring_matches_search)
-                .or_else(|| (0..start_char_idx).find(substring_matches_search)),
-            SearchDirection::Backward => (0..start_char_idx)
+                .or_else(|| before_start_pos.find(substring_matches_search)),
+            SearchDirection::Backward => before_start_pos
                 .rev()
                 .find(substring_matches_search)
-                .or_else(|| {
-                    (start_char_idx..self.rope.len_chars().saturating_sub(search_chars_len))
-                        .rev()
-                        .find(substring_matches_search)
-                }),
+                .or_else(|| after_start_pos.rev().find(substring_matches_search)),
         }
         .map(|result_char_idx| {
             let line = self.rope.char_to_line(result_char_idx);
