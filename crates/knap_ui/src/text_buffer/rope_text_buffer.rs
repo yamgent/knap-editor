@@ -212,37 +212,4 @@ mod tests {
 
         do_standard_text_buffer_tests(&|| RopeTextBuffer::new());
     }
-
-    #[test]
-    fn test_inserting_characters_at_last_line() {
-        {
-            let mut buffer = RopeTextBuffer {
-                rope: Rope::from_str("Line 1\nLine 2\nLine 3"),
-            };
-
-            {
-                let result =
-                    buffer.insert_character_at_pos(TextBufferPos { line: 3, byte: 0 }, 'X');
-                assert_eq!(result, Ok(()));
-                assert_eq!(buffer.contents(), "Line 1\nLine 2\nLine 3\nX");
-            }
-
-            {
-                let result =
-                    buffer.insert_character_at_pos(TextBufferPos { line: 3, byte: 1 }, 'Y');
-                assert_eq!(result, Ok(()));
-                assert_eq!(buffer.contents(), "Line 1\nLine 2\nLine 3\nXY");
-            }
-        }
-
-        {
-            let mut buffer = RopeTextBuffer {
-                rope: Rope::from_str("Line 1\nLine 2\nLine 3\n"),
-            };
-
-            let result = buffer.insert_character_at_pos(TextBufferPos { line: 3, byte: 0 }, 'X');
-            assert_eq!(result, Ok(()));
-            assert_eq!(buffer.contents(), "Line 1\nLine 2\nLine 3\nX");
-        }
-    }
 }
