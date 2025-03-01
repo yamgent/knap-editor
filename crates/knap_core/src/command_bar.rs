@@ -1,5 +1,8 @@
 use knap_base::math::{Bounds2f, Lossy, Vec2f};
-use knap_ui::text_box::{SearchDirection, TextBox, TextHighlights};
+use knap_ui::{
+    text_box::{TextBox, TextHighlights},
+    text_buffer::{SearchDirection, VecTextBuffer},
+};
 use knap_window::drawer::Drawer;
 
 use crate::{code_view::CodeView, commands::EditorCommand, message_bar::MessageBar};
@@ -24,7 +27,7 @@ impl CommandBarPrompt {
 pub(crate) struct CommandBar {
     bounds: Bounds2f,
     prompt: CommandBarPrompt,
-    text_box: TextBox,
+    text_box: TextBox<VecTextBuffer>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -38,7 +41,7 @@ impl CommandBar {
         Self {
             bounds: Bounds2f::ZERO,
             prompt: CommandBarPrompt::None,
-            text_box: TextBox::new_single_line_text_box(),
+            text_box: TextBox::new_single_line_text_box(VecTextBuffer::new()),
         }
     }
 
@@ -49,7 +52,7 @@ impl CommandBar {
 
     pub(crate) fn clear_prompt(&mut self) {
         self.prompt = CommandBarPrompt::None;
-        self.text_box.reset();
+        self.text_box = TextBox::new_single_line_text_box(VecTextBuffer::new());
     }
 
     pub(crate) fn set_prompt(&mut self, prompt: CommandBarPrompt) {
@@ -213,21 +216,31 @@ impl CommandBar {
                 }
             }
             EditorCommand::EraseCharacterBeforeCursor => {
-                self.text_box.erase_character_before_cursor();
-                self.on_input_updated(view);
-
-                CommandBarExecuteResult {
-                    is_command_handled: true,
-                    submitted_data: None,
+                if self.text_box.erase_character_before_cursor().is_ok() {
+                    self.on_input_updated(view);
+                    CommandBarExecuteResult {
+                        is_command_handled: true,
+                        submitted_data: None,
+                    }
+                } else {
+                    CommandBarExecuteResult {
+                        is_command_handled: false,
+                        submitted_data: None,
+                    }
                 }
             }
             EditorCommand::EraseCharacterAfterCursor => {
-                self.text_box.erase_character_after_cursor();
-                self.on_input_updated(view);
-
-                CommandBarExecuteResult {
-                    is_command_handled: true,
-                    submitted_data: None,
+                if self.text_box.erase_character_after_cursor().is_ok() {
+                    self.on_input_updated(view);
+                    CommandBarExecuteResult {
+                        is_command_handled: true,
+                        submitted_data: None,
+                    }
+                } else {
+                    CommandBarExecuteResult {
+                        is_command_handled: false,
+                        submitted_data: None,
+                    }
                 }
             }
             EditorCommand::Dismiss => {

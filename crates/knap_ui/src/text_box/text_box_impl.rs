@@ -4,14 +4,45 @@ use anyhow::Result;
 use knap_base::math::{Bounds2f, Lossy, ToU64, ToUsize, Vec2f, Vec2u};
 use knap_window::drawer::Drawer;
 
-use super::{
-    InsertCharError, InsertCharResult, SearchDirection, TextHighlightLine, TextHighlights, TextLine,
+use crate::text_buffer::{
+    InsertCharError, RemoveCharError, SearchDirection, TextBuffer, TextBufferPos,
 };
 
-pub struct TextBox {
+use super::{TextHighlightLine, TextHighlights, text_line::TextLine};
+
+pub struct InsertCharResult {
+    /// There could be scenarios where an insertion of
+    /// a new character results in grapheme clusters
+    /// merging together. In those situations, the line
+    /// length would not increase, and this value would
+    /// be false. Therefore the caret position should
+    /// not change.
+    ///
+    /// Otherwise, if there's a length increase, then
+    /// the caret position should change, and this
+    /// value would be true.
+    pub line_len_increased: bool,
+}
+
+pub struct RemoveCharResult {
+    /// There could be scenarios where a removal of
+    /// a character only results in the modification
+    /// of a grapheme cluster, instead of a complete
+    /// removal of the cluster. In those situations,
+    /// the line length would not decrease, and this
+    /// value would be false. Therefore, the caret
+    /// position should not change.
+    ///
+    /// Otherwise, if there's a length decrease, then
+    /// the caret position should change, and this
+    /// value would be true.
+    pub line_len_decreased: bool,
+}
+
+pub struct TextBox<B: TextBuffer> {
     bounds: Bounds2f,
 
-    contents: Vec<TextLine>,
+    contents: B,
     is_dirty: bool,
 
     /// Best effort single line mode.
@@ -42,11 +73,11 @@ pub struct TextBox {
     before_search_scroll_offset: Option<Vec2u>,
 }
 
-impl TextBox {
-    pub fn new() -> Self {
+impl<B: TextBuffer> TextBox<B> {
+    pub fn new(buffer: B) -> Self {
         Self {
             bounds: Bounds2f::ZERO,
-            contents: vec![],
+            contents: buffer,
             is_dirty: false,
             single_line_mode: false,
             caret_pos: Vec2u::ZERO,
@@ -61,10 +92,10 @@ impl TextBox {
     ///
     /// See `Self::single_line_mode` for more details regarding
     /// the "best effort" part.
-    pub fn new_single_line_text_box() -> Self {
+    pub fn new_single_line_text_box(buffer: B) -> Self {
         Self {
             single_line_mode: true,
-            ..Self::new()
+            ..Self::new(buffer)
         }
     }
 
@@ -86,7 +117,7 @@ impl TextBox {
     }
 
     pub fn set_contents<T: AsRef<str>>(&mut self, contents: T) {
-        self.contents = contents.as_ref().lines().map(TextLine::new).collect();
+        self.contents.set_contents(contents.as_ref());
         self.is_dirty = true;
 
         self.caret_pos.y = self.caret_pos.y.clamp(0, self.get_total_lines().to_u64());
@@ -106,16 +137,20 @@ impl TextBox {
 
     pub fn get_line_len(&self, line_idx: usize) -> usize {
         self.contents
-            .get(line_idx)
-            .map_or(0, TextLine::get_line_len)
+            .line(line_idx)
+            // TODO: This is not efficient
+            .map_or(0, |line| TextLine::new(line).get_line_len())
     }
 
     fn get_grid_pos_from_caret_pos(&self, caret_pos: Vec2u) -> Vec2u {
         Vec2u {
             x: self
                 .contents
-                .get(caret_pos.y.to_usize())
-                .map_or(0, |line| line.get_line_text_width(caret_pos.x.to_usize())),
+                .line(caret_pos.y.to_usize())
+                // TODO: This is not efficient
+                .map_or(0, |line| {
+                    TextLine::new(line).get_line_text_width(caret_pos.x.to_usize())
+                }),
             y: caret_pos.y,
         }
     }
@@ -287,94 +322,185 @@ impl TextBox {
         &mut self,
         ch: char,
     ) -> Result<InsertCharResult, InsertCharError> {
-        let result = if self.caret_pos.y == self.contents.len().to_u64() {
-            self.contents.push(TextLine::new(ch.to_string()));
-            Ok(InsertCharResult {
-                line_len_increased: true,
-            })
+        // TODO: This is not efficient
+        let target_line_render = if self.caret_pos.y == self.contents.total_lines().to_u64() {
+            TextLine::new("")
         } else {
-            match self.contents.get_mut(self.caret_pos.y.to_usize()) {
-                Some(line) => line.insert_character(self.caret_pos.x.to_usize(), ch),
-                None => Err(InsertCharError::InvalidPosition),
+            match self.contents.line(self.caret_pos.y.to_usize()) {
+                Some(line) => TextLine::new(line),
+                None => return Err(InsertCharError::InvalidLinePosition),
             }
         };
 
-        if let Ok(success_result) = &result {
-            self.is_dirty = true;
-            if success_result.line_len_increased {
-                self.change_caret_x(self.caret_pos.x.saturating_add(1));
-            }
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
+        let buffer_pos = TextBufferPos {
+            line: self.caret_pos.y.to_usize(),
+            byte: match target_line_render
+                .get_byte_idx_from_fragment_idx(self.caret_pos.x.to_usize())
+            {
+                Some(column) => column,
+                None => return Err(InsertCharError::InvalidBytePosition),
+            },
+        };
+
+        self.contents.insert_character_at_pos(buffer_pos, ch)?;
+        let line_len_increased = TextLine::new(
+            self.contents
+                .line(self.caret_pos.y.to_usize())
+                .expect("line to exist since we just modified it"),
+        )
+        .get_line_len()
+            > target_line_render.get_line_len();
+
+        self.is_dirty = true;
+        if line_len_increased {
+            self.change_caret_x(self.caret_pos.x.saturating_add(1));
         }
 
-        result
+        Ok(InsertCharResult { line_len_increased })
     }
 
-    fn remove_character(&mut self, line_idx: usize, fragment_idx: usize) {
-        if let Some(line) = self.contents.get_mut(line_idx) {
-            line.remove_character(fragment_idx);
-            self.is_dirty = true;
+    fn remove_character(
+        &mut self,
+        line_idx: usize,
+        fragment_idx: usize,
+    ) -> Result<RemoveCharResult, RemoveCharError> {
+        // TODO: This is not efficient
+        let target_line_render = match self.contents.line(line_idx) {
+            Some(line) => TextLine::new(line),
+            None => return Err(RemoveCharError::InvalidLinePosition),
+        };
+
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
+        let buffer_pos = TextBufferPos {
+            line: line_idx,
+            byte: match target_line_render.get_byte_idx_from_fragment_idx(fragment_idx) {
+                Some(byte) => byte,
+                None => return Err(RemoveCharError::InvalidBytePosition),
+            },
+        };
+
+        self.contents.remove_character_at_pos(buffer_pos)?;
+        self.is_dirty = true;
+
+        if let Some(new_line_render) = self.contents.line(line_idx).map(TextLine::new) {
+            Ok(RemoveCharResult {
+                line_len_decreased: new_line_render.get_line_len()
+                    < target_line_render.get_line_len(),
+            })
+        } else {
+            Ok(RemoveCharResult {
+                line_len_decreased: true,
+            })
         }
     }
 
-    fn join_line_with_below_line(&mut self, line_idx: usize) {
-        let mut new_line_string = None;
-
-        if let Some(first_line) = self.contents.get(line_idx) {
-            if let Some(second_line) = self.contents.get(line_idx.saturating_add(1)) {
-                let mut final_string = first_line.to_string();
-                final_string.push_str(&second_line.to_string());
-                new_line_string = Some(final_string);
-            }
-        }
-
-        if let Some(new_line) = new_line_string {
-            *self
-                .contents
-                .get_mut(line_idx)
-                .expect("line_idx to exist as new_line_string contains line_idx") =
-                TextLine::new(new_line);
-            self.contents.remove(line_idx.saturating_add(1));
-            self.is_dirty = true;
-        }
-    }
-
-    pub fn erase_character_before_cursor(&mut self) {
+    pub fn erase_character_before_cursor(&mut self) -> Result<RemoveCharResult, RemoveCharError> {
         if self.caret_pos.x > 0 {
-            self.remove_character(
+            let result = self.remove_character(
                 self.caret_pos.y.to_usize(),
                 self.caret_pos.x.saturating_sub(1).to_usize(),
             );
-            // TODO: If the line length still stays the same, then should not subtract 1 from caret_pos.x
-            self.change_caret_x(self.caret_pos.x.saturating_sub(1));
-            self.is_dirty = true;
+
+            if let Ok(result) = &result {
+                if result.line_len_decreased {
+                    self.change_caret_x(self.caret_pos.x.saturating_sub(1));
+                    self.is_dirty = true;
+                }
+            }
+
+            self.previous_line_caret_max_x.take();
+            result
         } else if self.caret_pos.y > 0 && !self.single_line_mode {
-            let previous_line_len = self
+            if self.caret_pos.y == self.contents.total_lines().to_u64() {
+                // TODO: this part exist because right now our cursor can actually go
+                // beyond the last line (in order to allow insert beyond the last line),
+                // but that design will no longer make sense when we introduce vim motions.
+                // At that point, we should revisit this code, and perhaps remove this
+                // special case.
+                self.previous_line_caret_max_x.take();
+                return Ok(RemoveCharResult {
+                    line_len_decreased: false,
+                });
+            }
+
+            let previous_line_fragments_len = self
                 .get_line_len(self.caret_pos.y.saturating_sub(1).to_usize())
                 .to_u64();
 
-            self.join_line_with_below_line(self.caret_pos.y.saturating_sub(1).to_usize());
+            if let Some(previous_line_len) = self
+                .contents
+                .line_len(self.caret_pos.y.saturating_sub(1).to_usize())
+            {
+                self.contents.remove_character_at_pos(TextBufferPos {
+                        line: self.caret_pos.y.saturating_sub(1).to_usize(),
+                        byte: previous_line_len,
+                    }).expect("previous line should exist, and it is legal to remove the pos right after the last character");
 
-            self.change_caret_xy(Vec2u {
-                x: previous_line_len,
-                y: self.caret_pos.y.saturating_sub(1),
-            });
+                self.change_caret_xy(Vec2u {
+                    x: previous_line_fragments_len,
+                    y: self.caret_pos.y.saturating_sub(1),
+                });
 
-            self.is_dirty = true;
+                self.is_dirty = true;
+            }
+
+            self.previous_line_caret_max_x.take();
+
+            Ok(RemoveCharResult {
+                // the (formally) active line was completely wiped out
+                // as it gets absorbed by the line above it
+                line_len_decreased: true,
+            })
         } else {
             self.previous_line_caret_max_x.take();
+
+            Ok(RemoveCharResult {
+                line_len_decreased: false,
+            })
         }
     }
 
-    pub fn erase_character_after_cursor(&mut self) {
+    pub fn erase_character_after_cursor(&mut self) -> Result<RemoveCharResult, RemoveCharError> {
         if self.caret_pos.x < self.get_line_len(self.caret_pos.y.to_usize()).to_u64() {
-            self.remove_character(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
-            self.is_dirty = true;
-        } else if self.caret_pos.y < self.get_total_lines().to_u64() && !self.single_line_mode {
-            self.join_line_with_below_line(self.caret_pos.y.to_usize());
-            self.is_dirty = true;
-        }
+            let result =
+                self.remove_character(self.caret_pos.y.to_usize(), self.caret_pos.x.to_usize());
 
-        self.previous_line_caret_max_x.take();
+            if result.is_ok() {
+                self.is_dirty = result.is_ok();
+                self.previous_line_caret_max_x.take();
+            }
+
+            result
+        } else if self.caret_pos.y < self.get_total_lines().to_u64() && !self.single_line_mode {
+            let line_len = self
+                .contents
+                .line_len(self.caret_pos.y.to_usize())
+                .expect("line should exist");
+
+            if self
+                .contents
+                .remove_character_at_pos(TextBufferPos {
+                    line: self.caret_pos.y.to_usize(),
+                    byte: line_len,
+                })
+                .is_ok()
+            {
+                self.is_dirty = true;
+            }
+
+            self.previous_line_caret_max_x.take();
+
+            Ok(RemoveCharResult {
+                // the active line length actually increased / stay the same, it can't decrease
+                line_len_decreased: false,
+            })
+        } else {
+            self.previous_line_caret_max_x.take();
+            Ok(RemoveCharResult {
+                line_len_decreased: false,
+            })
+        }
     }
 
     pub fn insert_newline_at_cursor(&mut self) {
@@ -384,49 +510,51 @@ impl TextBox {
 
         assert!(self.caret_pos.y <= self.get_total_lines().to_u64());
 
-        match self.contents.get_mut(self.caret_pos.y.to_usize()) {
-            Some(line) => {
-                let new_line = line.split_off(self.caret_pos.x.to_usize());
-                self.contents
-                    .insert(self.caret_pos.y.saturating_add(1).to_usize(), new_line);
-            }
-            None => {
-                self.contents.push(TextLine::new(""));
-            }
-        }
+        // TODO: This is not efficient
+        let target_line_render = match self.contents.line(self.caret_pos.y.to_usize()) {
+            Some(line) => TextLine::new(line),
+            None => TextLine::new(""),
+        };
+
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
+        let buffer_pos = TextBufferPos {
+            line: self.caret_pos.y.to_usize(),
+            byte: match target_line_render
+                .get_byte_idx_from_fragment_idx(self.caret_pos.x.to_usize())
+            {
+                Some(byte) => byte,
+                None => return,
+            },
+        };
+
+        let insert_successful = self
+            .contents
+            .insert_character_at_pos(buffer_pos, '\n')
+            .is_ok();
 
         self.change_caret_xy(Vec2u {
             x: 0,
             y: self.caret_pos.y.saturating_add(1),
         });
 
-        self.is_dirty = true;
+        if insert_successful {
+            self.is_dirty = true;
+        }
     }
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_entire_contents_as_string(&self) -> String {
-        self.contents
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("\n")
+        self.contents.contents()
     }
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_raw_line(&self, line_idx: usize) -> Option<String> {
-        self.contents.get(line_idx).map(ToString::to_string)
-    }
-
-    pub fn reset(&mut self) {
-        self.contents = vec![];
-        self.caret_pos = Vec2u::ZERO;
-        self.scroll_offset = Vec2u::ZERO;
-        self.is_dirty = false;
+        self.contents.line(line_idx)
     }
 
     // TODO: When we use a backend text object (like ropey), this method shouldn't be here
     pub fn get_total_lines(&self) -> usize {
-        self.contents.len()
+        self.contents.total_lines()
     }
 
     fn find_in_contents<T: AsRef<str>>(
@@ -435,50 +563,39 @@ impl TextBox {
         start_pos: Vec2u,
         search_direction: SearchDirection,
     ) -> Option<Vec2u> {
-        if let Some(first_line) = self.contents.get(start_pos.y.to_usize()) {
-            let first_line_result = first_line
-                .find(&search, Some(start_pos.x.to_usize()), search_direction)
-                .map(|fragment_idx| Vec2u {
-                    x: fragment_idx.to_u64(),
-                    y: start_pos.y,
-                });
-
-            if first_line_result.is_some() {
-                return first_line_result;
+        // TODO: This is not efficient
+        let target_line_render = if start_pos.y == self.contents.total_lines().to_u64() {
+            TextLine::new("")
+        } else {
+            match self.contents.line(start_pos.y.to_usize()) {
+                Some(line) => TextLine::new(line),
+                None => return None,
             }
-        }
+        };
 
-        match search_direction {
-            SearchDirection::Forward => self
-                .contents
-                .iter()
-                .enumerate()
-                .cycle()
-                .skip(start_pos.y.saturating_add(1).to_usize())
-                .take(self.contents.len().saturating_sub(1))
-                .find_map(|(line_idx, line)| {
-                    line.find(&search, None, search_direction)
-                        .map(|fragment_idx| Vec2u {
-                            x: fragment_idx.to_u64(),
-                            y: line_idx.to_u64(),
-                        })
-                }),
-            SearchDirection::Backward => self
-                .contents
-                .iter()
-                .enumerate()
-                .rev()
-                .cycle()
-                .skip(self.contents.len().saturating_sub(start_pos.y.to_usize()))
-                .take(self.contents.len().saturating_sub(1))
-                .find_map(|(line_idx, line)| {
-                    line.find(&search, None, search_direction)
-                        .map(|fragment_idx| Vec2u {
-                            x: fragment_idx.to_u64(),
-                            y: line_idx.to_u64(),
-                        })
-                }),
-        }
+        // TODO: This logic can be further refactored (it is copied and slightly modified across multiple functions)
+        let buffer_pos = TextBufferPos {
+            line: start_pos.y.to_usize(),
+            byte: target_line_render.get_byte_idx_from_fragment_idx(start_pos.x.to_usize())?,
+        };
+
+        self.contents
+            .find(search.as_ref(), buffer_pos, search_direction)
+            .map(|result| {
+                let final_line_render = TextLine::new(
+                    self.contents
+                        .line(result.line)
+                        .expect("result should return a valid line"),
+                );
+                let final_fragment_idx = final_line_render
+                    .get_fragment_idx_from_byte_idx(result.byte)
+                    .expect("result should return a valid byte index");
+
+                Vec2u {
+                    x: final_fragment_idx.to_u64(),
+                    y: result.line.to_u64(),
+                }
+            })
     }
 
     pub fn enter_search_mode(&mut self) {
@@ -541,8 +658,12 @@ impl TextBox {
         text_offset_x: Range<u64>,
         line_highlight: &TextHighlightLine,
     ) {
-        match self.contents.get(line_idx) {
-            Some(line) => line.render_line(drawer, screen_pos, text_offset_x, line_highlight),
+        match self.contents.line(line_idx) {
+            Some(line) => {
+                // TODO: This is not efficient
+                let line_render = TextLine::new(line);
+                line_render.render_line(drawer, screen_pos, text_offset_x, line_highlight);
+            }
             None => {
                 if !self.single_line_mode {
                     drawer.draw_text(screen_pos, "~");

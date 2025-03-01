@@ -4,8 +4,9 @@ use knap_base::{
     color::Color,
     math::{ToUsize, Vec2u},
 };
-use knap_ui::text_box::{
-    TextBox, TextColor, TextHighlightBlock, TextHighlightLine, TextHighlights,
+use knap_ui::{
+    text_box::{TextBox, TextColor, TextHighlightBlock, TextHighlightLine, TextHighlights},
+    text_buffer::TextBuffer,
 };
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
@@ -36,9 +37,10 @@ pub(crate) struct Highlights {
     highlights: Vec<Highlight>,
 }
 
-pub(crate) struct HighlightInfo {
+pub(crate) struct HighlightInfo<B: TextBuffer> {
     text_highlight: TextHighlights,
     file_type: FileType,
+    _phantom: std::marker::PhantomData<B>,
 }
 
 thread_local! {
@@ -242,15 +244,16 @@ fn map_highlights_to_text_highlight_line(highlights: Highlights) -> TextHighligh
     }
 }
 
-impl HighlightInfo {
+impl<B: TextBuffer> HighlightInfo<B> {
     pub(crate) fn new() -> Self {
         Self {
             text_highlight: TextHighlights::new(),
             file_type: FileType::PlainText,
+            _phantom: std::marker::PhantomData,
         }
     }
 
-    pub(crate) fn update_file_type(&mut self, text_box: &TextBox, file_type: FileType) {
+    pub(crate) fn update_file_type(&mut self, text_box: &TextBox<B>, file_type: FileType) {
         self.file_type = file_type;
         self.regenerate_on_buffer_change(text_box);
     }
@@ -258,7 +261,7 @@ impl HighlightInfo {
     // TODO: When we use a backend text object (like ropey), this shouldn't take in text_box
     pub(crate) fn regenerate_on_search_change<T: AsRef<str>>(
         &mut self,
-        text_box: &TextBox,
+        text_box: &TextBox<B>,
         search_text: T,
         search_cursor_pos: Vec2u,
     ) {
@@ -290,7 +293,7 @@ impl HighlightInfo {
     }
 
     // TODO: When we use a backend text object (like ropey), this shouldn't take in text_box
-    pub(crate) fn regenerate_on_buffer_change(&mut self, text_box: &TextBox) {
+    pub(crate) fn regenerate_on_buffer_change(&mut self, text_box: &TextBox<B>) {
         self.text_highlight = TextHighlights {
             lines: (0..text_box.get_total_lines())
                 .filter_map(|line_idx| text_box.get_raw_line(line_idx))
@@ -310,7 +313,7 @@ impl HighlightInfo {
         }
     }
 
-    pub(crate) fn clear_search_highlights(&mut self, text_box: &TextBox) {
+    pub(crate) fn clear_search_highlights(&mut self, text_box: &TextBox<B>) {
         self.regenerate_on_buffer_change(text_box);
     }
 

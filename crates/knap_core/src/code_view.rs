@@ -2,7 +2,10 @@ use std::{fs::File, io::Write};
 
 use anyhow::Result;
 use knap_base::math::Bounds2f;
-use knap_ui::text_box::{SearchDirection, TextBox};
+use knap_ui::{
+    text_box::TextBox,
+    text_buffer::{RopeTextBuffer, SearchDirection},
+};
 use knap_window::drawer::Drawer;
 
 use crate::{
@@ -33,9 +36,9 @@ pub(crate) struct CodeView {
     filename: Option<String>,
     file_type: FileType,
 
-    text_box: TextBox,
+    text_box: TextBox<RopeTextBuffer>,
 
-    highlight_info: HighlightInfo,
+    highlight_info: HighlightInfo<RopeTextBuffer>,
 }
 
 impl CodeView {
@@ -43,7 +46,7 @@ impl CodeView {
         Self {
             filename: None,
             file_type: FileType::PlainText,
-            text_box: TextBox::new(),
+            text_box: TextBox::new(RopeTextBuffer::new()),
             bounds: Bounds2f::ZERO,
             highlight_info: HighlightInfo::new(),
         }
@@ -51,7 +54,7 @@ impl CodeView {
 
     pub(crate) fn new_from_file<T: AsRef<str>>(filename: T) -> Result<Self> {
         let content = std::fs::read_to_string(filename.as_ref())?;
-        let mut text_box = TextBox::new();
+        let mut text_box = TextBox::new(RopeTextBuffer::new());
         text_box.set_contents(content);
         text_box.set_is_dirty(false);
 
@@ -188,16 +191,22 @@ impl CodeView {
                 }
             }
             EditorCommand::EraseCharacterBeforeCursor => {
-                self.text_box.erase_character_before_cursor();
-                self.highlight_info
-                    .regenerate_on_buffer_change(&self.text_box);
-                true
+                if self.text_box.erase_character_before_cursor().is_ok() {
+                    self.highlight_info
+                        .regenerate_on_buffer_change(&self.text_box);
+                    true
+                } else {
+                    false
+                }
             }
             EditorCommand::EraseCharacterAfterCursor => {
-                self.text_box.erase_character_after_cursor();
-                self.highlight_info
-                    .regenerate_on_buffer_change(&self.text_box);
-                true
+                if self.text_box.erase_character_after_cursor().is_ok() {
+                    self.highlight_info
+                        .regenerate_on_buffer_change(&self.text_box);
+                    true
+                } else {
+                    false
+                }
             }
 
             EditorCommand::InsertNewline => {
